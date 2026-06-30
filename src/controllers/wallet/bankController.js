@@ -1,7 +1,7 @@
 
-const Bank = require("../models/Bank");
-const Notification = require("../models/Notification");
-const { sendNotification } = require("../utils/notify");
+const Bank = require("../../models/Bank");
+const Notification = require("../../models/Notification");
+const { sendNotification } = require("../../utils/notify");
 const bcrypt = require("bcrypt");
 
  //=========================add bank============

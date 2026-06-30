@@ -1,9 +1,9 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
  
-const User = require("../models/User");
-const BankDetails = require("../models/Bank");
-const Wallet = require("../models/Wallet");
+const User = require("../../models/User");
+const BankDetails = require("../../models/Bank");
+const Wallet = require("../../models/Wallet");
  
 // Valid adminRole values for sub-admins (super_admin is env-var only, never stored via API)
 const VALID_ADMIN_ROLES = [

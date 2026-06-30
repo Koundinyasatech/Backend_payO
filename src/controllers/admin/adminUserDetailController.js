@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 
-const Kyc         = require("../models/Kyc");
-const User        = require("../models/User");
-const Transaction = require("../models/Transaction");
-const Wallet      = require("../models/Wallet");
+const Kyc         = require("../../models/Kyc");
+const User        = require("../../models/User");
+const Transaction = require("../../models/Transaction");
+const Wallet      = require("../../models/Wallet");
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPER — convert stored file path → public URL

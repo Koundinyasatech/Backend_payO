@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const walletController = require("../../controllers/wallet/walletController");
-const auth = require("../middleware/auth");
+const auth = require("../../middleware/auth");
  
  
 router.post("/transfer", auth, walletController.transfer);

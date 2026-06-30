@@ -1,8 +1,8 @@
 const express = require("express");
 const router  = express.Router();
  
-const auth = require("../middleware/auth");           // your existing JWT middleware
-const { uploadAadhar, uploadPan, uploadPassport, uploadPassbook,uploadCheque,uploadStatement } = require("../middleware/kycUpload");
+const auth = require("../../middleware/auth");           // your existing JWT middleware
+const { uploadAadhar, uploadPan, uploadPassport, uploadPassbook,uploadCheque,uploadStatement } = require("../../middleware/kycUpload");
  
 const {
   // User flows (match all 6 screens)

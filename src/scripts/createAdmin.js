@@ -4,7 +4,7 @@ const dotenv   = require("dotenv");
  
 dotenv.config();
  
-const User = require("../models/User");
+const User = require("../../models/User");
  
 const ADMIN_DATA = {
   name:     "Super Admin",

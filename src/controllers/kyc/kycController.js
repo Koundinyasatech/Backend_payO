@@ -1,5 +1,5 @@
-const Kyc   = require("../models/Kyc");
-const User  = require("../models/User");
+const Kyc   = require("../../models/Kyc");
+const User  = require("../../models/User");
 const path  = require("path");
 const fs=require("fs");
  

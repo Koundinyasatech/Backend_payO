@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
-const Transaction = require("../models/Transaction");
-const Wallet = require("../models/Wallet");
-const User = require("../models/User");
+const Transaction = require("../../models/Transaction");
+const Wallet = require("../../models/Wallet");
+const User = require("../../models/User");
 
 const REFERRAL_BONUS = 50;
 

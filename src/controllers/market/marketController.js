@@ -1,9 +1,9 @@
 // controllers/marketController.js (updated)
-const binanceService = require("../services/binanceService");
-const coingeckoService = require("../services/coingeckoService");
-const marketModel = require("../models/marketModels");
-const realtimePriceCache = require("../cache/realtimePriceCache");
-const websocketManager = require("../utils/websocketManager");
+const binanceService = require("../../services/binanceService");
+const coingeckoService = require("../../services/coingeckoService");
+const marketModel = require("../../models/marketModels");
+const realtimePriceCache = require("../../cache/realtimePriceCache");
+const websocketManager = require("../../utils/websocketManager");
 
 class MarketController {
 

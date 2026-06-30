@@ -1,14 +1,14 @@
-const Wallet = require("../models/Wallet");
-const User = require("../models/User");
-const Transaction = require("../models/Transaction");
-const { generateWalletAddress, generateQR } = require("../utils/helpers");
+const Wallet = require("../../models/Wallet");
+const User = require("../../models/User");
+const Transaction = require("../../models/Transaction");
+const { generateWalletAddress, generateQR } = require("../../utils/helpers");
 const bcrypt = require("bcrypt");
 const QRCode = require("qrcode");
 const { v4: uuidv4 } = require("uuid");
-const Recent = require("../models/Recents");
-const Bank = require("../models/Bank");
-const Notification = require("../models/Notification");
-const { sendNotification } = require("../utils/notify");
+const Recent = require("../../models/Recents");
+const Bank = require("../../models/Bank");
+const Notification = require("../../models/Notification");
+const { sendNotification } = require("../../utils/notify");
  
 // ================= get wallet =================
 exports.getWallet = async (req, res) => {  

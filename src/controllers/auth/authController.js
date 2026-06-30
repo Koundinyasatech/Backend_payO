@@ -2,13 +2,13 @@ const bcrypt = require("bcrypt");
 const jwt    = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 
-const User        = require("../models/User");
-const Otp         = require("../models/Otp");
-const Wallet      = require("../models/Wallet");
-const Transaction = require("../models/Transaction");
-const Kyc         = require("../models/Kyc");           // ← NEW
-const { sendNotification } = require("../utils/notify");
-const { generateWalletAddress, generateQR } = require("../utils/helpers");
+const User        = require("../../models/User");
+const Otp         = require("../../models/Otp");
+const Wallet      = require("../../models/Wallet");
+const Transaction = require("../../models/Transaction");
+const Kyc         = require("../../models/Kyc");           // ← NEW
+const { sendNotification } = require("../../utils/notify");
+const { generateWalletAddress, generateQR } = require("../../utils/helpers");
 
 // ======================register========================
 exports.register = async (req, res) => {

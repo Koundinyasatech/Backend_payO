@@ -1,8 +1,8 @@
 
-const tradingDataModel = require('../models/tradingDataModel');
-const binanceService = require('../services/binanceService');
-const realtimePriceCache = require('../cache/realtimePriceCache');
-const coingeckoService = require('../services/coingeckoService');
+const tradingDataModel = require('../../models/tradingDataModel');
+const binanceService = require('../../services/binanceService');
+const realtimePriceCache = require('../../cache/realtimePriceCache');
+const coingeckoService = require('../../services/coingeckoService');
 class TradingController {
   
   // Get candlestick data for a symbol
