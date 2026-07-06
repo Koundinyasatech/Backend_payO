@@ -348,29 +348,77 @@ exports.verifyOtp = async (req, res) => {
 };
 
 // ======================send otp========================
+// exports.sendOtp = async (req, res) => {
+//   const { mobile } = req.body;
+
+//   if (!/^[0-9]{10}$/.test(mobile)) {
+//     return res.status(400).json({ message: "Invalid mobile" });
+//   }
+
+//   const existingUser = await User.findOne({ mobile });
+//   if (existingUser) {
+//     return res.status(400).json({ message: "Mobile number already registered. Please login" });
+//   }
+
+//   const otp       = Math.floor(1000 + Math.random() * 9000).toString();
+//   const hashedOtp = await bcrypt.hash(otp, 10);
+
+//   await Otp.findOneAndUpdate(
+//     { mobile },
+//     { $set: { otp: hashedOtp, isVerified: false, expiresAt: Date.now() + 2 * 60 * 1000 } },
+//     { upsert: true, returnDocument: "after" }
+//   );
+
+//   console.log("OTP:", otp);
+//   res.json({ message: "OTP sent", otp });
+// };
 exports.sendOtp = async (req, res) => {
-  const { mobile } = req.body;
+  try {
+    const { mobile } = req.body;
 
-  if (!/^[0-9]{10}$/.test(mobile)) {
-    return res.status(400).json({ message: "Invalid mobile" });
+    if (!/^[0-9]{10}$/.test(mobile)) {
+      return res.status(400).json({
+        message: "Invalid mobile number",
+      });
+    }
+
+    const existingUser = await User.findOne({ mobile });
+
+    if (existingUser) {
+      return res.status(400).json({
+        message: "Mobile number already registered. Please login",
+      });
+    }
+
+    const response = await axios.post(
+      "https://control.msg91.com/api/v5/otp",
+      {
+        mobile: `91${mobile}`,
+        template_id: process.env.MSG91_TEMPLATE_ID,
+        authkey: process.env.MSG91_AUTHKEY,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log("MSG91:", response.data);
+
+    return res.status(200).json({
+      message: "OTP sent successfully",
+      request_id: response.data.request_id,
+    });
+
+  } catch (err) {
+    console.log(err.response?.data || err.message);
+
+    return res.status(500).json({
+      message: "Failed to send OTP",
+      error: err.response?.data || err.message,
+    });
   }
-
-  const existingUser = await User.findOne({ mobile });
-  if (existingUser) {
-    return res.status(400).json({ message: "Mobile number already registered. Please login" });
-  }
-
-  const otp       = Math.floor(1000 + Math.random() * 9000).toString();
-  const hashedOtp = await bcrypt.hash(otp, 10);
-
-  await Otp.findOneAndUpdate(
-    { mobile },
-    { $set: { otp: hashedOtp, isVerified: false, expiresAt: Date.now() + 2 * 60 * 1000 } },
-    { upsert: true, returnDocument: "after" }
-  );
-
-  console.log("OTP:", otp);
-  res.json({ message: "OTP sent", otp });
 };
 
 // ================= set pin =================
@@ -560,3 +608,399 @@ exports.resetSendOtp = async (req, res) => {
   console.log("OTP:", otp);
   res.json({ message: "OTP sent", otp });
 };
+
+
+
+// const bcrypt = require("bcrypt");
+// const jwt    = require("jsonwebtoken");
+// const { v4: uuidv4 } = require("uuid");
+
+// const User        = require("../../models/User");
+// const Otp         = require("../../models/Otp");
+// const Wallet      = require("../../models/Wallet");
+// const Transaction = require("../../models/Transaction");
+// const Kyc         = require("../../models/Kyc");           // ← NEW
+// const { sendNotification } = require("../../utils/notify");
+// const { generateWalletAddress, generateQR } = require("../../utils/helpers");
+
+// // ======================register========================
+// exports.register = async (req, res) => {
+//   try {
+//     const { name, email, password, confirmpassword, referralCode } = req.body;
+
+//     // ── Token ──────────────────────────────────────────────
+//     const authHeader = req.headers.authorization;
+//     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+//       return res.status(401).json({ message: "No token or invalid format" });
+//     }
+//     const token   = authHeader.split(" ")[1];
+//     const decoded = jwt.verify(token, "mysecretkey");
+//     const mobile  = decoded.mobile;
+
+//     if (!mobile) {
+//       return res.status(400).json({ message: "Mobile missing" });
+//     }
+
+//     // ── Validations ────────────────────────────────────────
+//     if (!name || !email || !password || !confirmpassword) {
+//       return res.status(400).json({ message: "All fields required" });
+//     }
+
+//     if (typeof name !== "string" || name.trim().length < 3) {
+//       return res.status(400).json({ message: "Name must contain minimum 3 characters" });
+//     }
+
+//     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//     if (!emailRegex.test(email)) {
+//       return res.status(400).json({ message: "Invalid email format. Example: user@gmail.com" });
+//     }
+
+//     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+//     if (!passwordRegex.test(password)) {
+//       return res.status(400).json({
+//         message: "Use 8+ chars with uppercase, lowercase, number & special character",
+//       });
+//     }
+
+//     if (password !== confirmpassword) {
+//       return res.status(400).json({ message: "Passwords mismatch" });
+//     }
+
+//     const existEmail = await User.findOne({ email });
+//     if (existEmail) {
+//       return res.status(400).json({ message: "Email already exists" });
+//     }
+
+//     const existMobile = await User.findOne({ mobile });
+//     if (existMobile) {
+//       return res.status(400).json({ message: "Mobile number already exists" });
+//     }
+
+   
+
+//     // ── Referral check ─────────────────────────────────────
+//     let referrer = null;
+//     if (referralCode) {
+//       referrer = await User.findOne({ myReferralCode: referralCode });
+//       if (!referrer) {
+//         return res.status(400).json({ message: "Invalid referral code" });
+//       }
+//     }
+
+//     // ── Create user ────────────────────────────────────────
+//     const hash       = await bcrypt.hash(password, 10);
+//     const myReferral = "PAYO" + uuidv4().slice(0, 6);
+
+//     const user = await User.create({
+//       name,
+//       email,
+//       password: hash,
+//       mobile,
+//       referredBy:      referralCode || null,
+//       myReferralCode:  myReferral,
+//       isVerified:      true,
+//       // KYC starts as false — only true after admin approves
+//       kycVerified:     false,
+//       walletActivated: false,
+//     });
+
+//     await sendNotification({
+//       userId:  user._id,
+//       title:   "Welcome to PAYO",
+//       message: "Please complete KYC to activate your wallet",
+//       type:    "SYSTEM",
+//     });
+
+//     // ── Create wallet ──────────────────────────────────────
+//     const walletAddress = generateWalletAddress();
+//     const qr            = await generateQR(walletAddress);
+
+//     const wallet = await Wallet.create({
+//       userId:        user._id,
+//       walletAddress: generateWalletAddress(),
+//       addressExpiry: Date.now() + 60 * 60 * 1000,
+//       qrToken:       uuidv4(),
+//       qrExpiry:      Date.now() + 15 * 60 * 1000,
+//     });
+
+//     await User.findByIdAndUpdate(user._id, { walletId: wallet._id });
+
+//     // ── Referral bonus ─────────────────────────────────────
+//     const REFERRAL_BONUS = 50;
+//     if (referralCode && referrer) {
+//       if (referrer._id.toString() === user._id.toString()) {
+//         return res.status(400).json({ message: "You cannot refer yourself" });
+//       }
+
+//       const referrerWallet = await Wallet.findOne({ userId: referrer._id });
+//       if (!referrerWallet) {
+//         return res.status(404).json({ message: "Referrer wallet not found" });
+//       }
+
+//       referrerWallet.balance += REFERRAL_BONUS;
+//       await referrerWallet.save();
+
+//       await Transaction.create({
+//         userId:  referrer._id,
+//         amount:  REFERRAL_BONUS,
+//         type:    "credit",
+//         message: "Referral bonus received",
+//       });
+
+//       await sendNotification({
+//         userId:  referrer._id,
+//         title:   "Referral Reward",
+//         message: `You earned ${REFERRAL_BONUS} PAYO`,
+//         type:    "REWARD",
+//       });
+//     }
+
+  
+
+//     // ── Response ───────────────────────────────────────────
+//     res.status(201).json({
+//       message:        "Registered successfully. Please complete KYC to access the app.",
+//       myReferralCode: user.myReferralCode,
+//       kycRequired:    true,         // ← tells the app to go to KYC screen
+//       wallet: {
+//         walletAddress: wallet.walletAddress,
+//         balance:       wallet.balance,
+//       },
+//     });
+
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Server Error" });
+//   }
+// };
+
+// // ======================login========================
+// // ── KEY CHANGE: checks KYC status and tells app where to send user ──────────
+// exports.login = async (req, res) => {
+//   try {
+//     const { email, mobile, password } = req.body;
+
+//     // find user
+//     const user = email
+//       ? await User.findOne({ email })
+//       : await User.findOne({ mobile });
+
+//     if (!user) return res.status(400).json({ message: "User not found" });
+
+//     // check password
+//     const match = await bcrypt.compare(password, user.password);
+//     if (!match) return res.status(400).json({ message: "Wrong password" });
+
+//     // ── KYC STATUS CHECK ──────────────────────────────────────────────────
+//     // Check KYC record to know the exact status
+//     const kyc = await Kyc.findOne({ userId: user._id });
+
+//     const kycStatus = kyc ? kyc.status : "not_started";
+
+//     // Block login ONLY if KYC was rejected (they must retry)
+//     // Allow login for not_started, documents_uploaded, under_review, approved
+//     if (kycStatus === "rejected") {
+//       return res.status(403).json({
+//         message:   "Your KYC verification failed. Please retry.",
+//         kycStatus: "rejected",
+//         action:    "retry_kyc",  // tells app to show retry screen
+//       });
+//     }
+
+//     // generate token
+//     const token = jwt.sign(
+//       { id: user._id, mobile: user.mobile },
+//       "mysecretkey",
+//       { expiresIn: "24h" } 
+//     );
+
+//     await sendNotification({
+//       userId:  user._id,
+//       title:   "Login Alert",
+//       message: "You logged into your account",
+//       type:    "SECURITY",
+//     });
+
+//     // ── Tell the app exactly where to navigate ────────────────────────────
+//     let redirectTo = "home"; // default — KYC approved, full access
+
+//     if (kycStatus === "not_started") {
+//       redirectTo = "kyc_upload";      // → go to Screen 1 (upload docs)
+//     } else if (kycStatus === "documents_uploaded" || kycStatus === "under_review") {
+//       redirectTo = "kyc_under_review"; // → go to Screen 4 (waiting)
+//     } else if (kycStatus === "approved") {
+//       redirectTo = "home";             // → full app access
+//     }
+
+//     res.json({
+//       message:   "Login success",
+//       token,
+//       kycStatus,
+//       redirectTo,  // ← front-end uses this to navigate to correct screen
+//       user: {
+//         id:              user._id,
+//         name:            user.name,
+//         email:           user.email,
+//         mobile:          user.mobile,
+//         kycVerified:     user.kycVerified,
+//         walletActivated: user.walletActivated,
+//       },
+//     });
+
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// };
+
+
+
+// // ================= set pin =================
+// exports.setPin = async (req, res) => {
+//   try {
+//     const { pin } = req.body;
+
+//     if (!pin) return res.status(400).json({ message: "PIN is required" });
+//     if (!/^\d{4}$/.test(pin)) return res.status(400).json({ message: "PIN must be 4 digits" });
+//     if (!req.userId) return res.status(401).json({ message: "Invalid token (no userId)" });
+
+//     const user = await User.findById(req.userId);
+//     if (!user) return res.status(404).json({ message: "User not found" });
+
+//     user.transactionPin = await bcrypt.hash(pin, 10);
+//     await user.save();
+
+//     res.json({ message: "Transaction PIN set successfully" });
+
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Error setting PIN" });
+//   }
+// };
+
+// // ================= change transaction pin =================
+// exports.changePin = async (req, res) => {
+//   try {
+//     const { old_pin, new_pin } = req.body;
+
+//     if (!old_pin || !new_pin) return res.status(400).json({ message: "Old PIN and New PIN are required" });
+//     if (!/^\d{4}$/.test(new_pin)) return res.status(400).json({ message: "New PIN must be 4 digits" });
+//     if (!req.userId) return res.status(401).json({ message: "Invalid token" });
+
+//     const user = await User.findById(req.userId);
+//     if (!user || !user.transactionPin) return res.status(404).json({ message: "User or PIN not found" });
+
+//     const isMatch = await bcrypt.compare(old_pin, user.transactionPin);
+//     if (!isMatch) return res.status(400).json({ message: "Old PIN is incorrect" });
+
+//     const isSame = await bcrypt.compare(new_pin, user.transactionPin);
+//     if (isSame) return res.status(400).json({ message: "New PIN cannot be same as old PIN" });
+
+//     user.transactionPin = await bcrypt.hash(new_pin, 10);
+//     await user.save();
+
+//     res.json({ message: "PIN changed successfully" });
+
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Error changing PIN" });
+//   }
+// };
+
+
+// // ================= reset password =================
+// exports.resetPassword = async (req, res) => {
+//   try {
+//     const { password, confirmPassword } = req.body;
+
+//     if (!password || !confirmPassword) return res.status(400).json({ message: "All fields required" });
+//     if (password !== confirmPassword) return res.status(400).json({ message: "Passwords mismatch" });
+
+//     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
+//     if (!passwordRegex.test(password)) {
+//       return res.status(400).json({ message: "Use 8+ chars with uppercase, lowercase, number & special character" });
+//     }
+
+//     const user = await User.findById(req.userId);
+//     if (!user) return res.status(404).json({ message: "User not found" });
+
+//     const isSame = await bcrypt.compare(password, user.password);
+//     if (isSame) return res.status(400).json({ message: "New password cannot be same as old password" });
+
+//     user.password = await bcrypt.hash(password, 10);
+//     await user.save();
+
+//     if (req.mobile) await Otp.deleteOne({ mobile: req.mobile });
+
+//     res.json({ message: "Password changed successfully" });
+
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// };
+
+
+
+// exports.verifyAccessToken = async (req, res) => {
+//   try {
+//     const { accessToken } = req.body;
+
+//     if (!accessToken) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Access token is required",
+//       });
+//     }
+
+//     // Verify Access Token with MSG91
+//     const response = await axios.post(
+//       "https://control.msg91.com/api/v5/widget/verifyAccessToken",
+//       {
+//         authkey: process.env.MSG91_AUTHKEY,
+//         "access-token": accessToken,
+//       },
+//       {
+//         headers: {
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
+
+//     console.log("MSG91 Response:", response.data);
+
+//     // Make sure mobile is returned
+//     if (!response.data.mobile) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Invalid Access Token",
+//         msg91: response.data,
+//       });
+//     }
+
+//     const mobile = response.data.mobile;
+
+//     // Generate your application's JWT
+//     const token = jwt.sign(
+//       { mobile },
+//       "mysecretkey",
+//       { expiresIn: "24h" }
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "OTP Verified Successfully",
+//       token,
+//       mobile,
+//     });
+
+//   } catch (err) {
+//     console.error("MSG91 Error:", err.response?.data || err.message);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "OTP verification failed",
+//       error: err.response?.data || err.message,
+//     });
+//   }
+// };
