@@ -13,7 +13,7 @@ const fs=require("fs");
 const toPublicUrl = (req, filePath) => {
   if (!filePath) return null;
   // Get relative path from uploads folder
-  const relativePath = path.relative(path.join(__dirname, "../uploads"), filePath);
+  const relativePath = path.relative(path.join(__dirname, "../../uploads"), filePath);
   // Convert Windows backslashes to forward slashes
   const normalizedPath = relativePath.replace(/\\/g, "/");
   return `${req.protocol}://${req.get("host")}/kyc-docs/${normalizedPath}`;
@@ -92,7 +92,7 @@ const uploadAadharDocuments = async (req, res) => {
 
     const uploadDir = path.join(
       __dirname,
-      "../uploads/kyc",
+      "../../uploads/kyc",
       userId.toString()
     );
 
@@ -194,7 +194,7 @@ const uploadPanDocuments = async (req, res) => {
 
     const uploadDir = path.join(
       __dirname,
-      "../uploads/kyc",
+      "../../uploads/kyc",
       userId.toString()
     );
 
@@ -278,7 +278,7 @@ const uploadPassportDocuments = async (req, res) => {
 
     const uploadDir = path.join(
       __dirname,
-      "../uploads/kyc",
+      "../../uploads/kyc",
       userId.toString()
     );
 
@@ -359,7 +359,7 @@ const uploadPassbookDocuments = async (req, res) => {
 
     const uploadDir = path.join(
       __dirname,
-      "../uploads/kyc",
+      "../../uploads/kyc",
       userId.toString()
     );
 
@@ -439,7 +439,7 @@ const uploadCancelledChequeDocuments = async (req, res) => {
 
     const uploadDir = path.join(
       __dirname,
-      "../uploads/kyc",
+      "../../uploads/kyc",
       userId.toString()
     );
 
@@ -520,7 +520,7 @@ const uploadStatementDocuments = async (req, res) => {
 
     const uploadDir = path.join(
       __dirname,
-      "../uploads/kyc",
+      "../../uploads/kyc",
       userId.toString()
     );
 
