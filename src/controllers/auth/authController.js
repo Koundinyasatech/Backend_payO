@@ -348,77 +348,29 @@ exports.verifyOtp = async (req, res) => {
 };
 
 // ======================send otp========================
-// exports.sendOtp = async (req, res) => {
-//   const { mobile } = req.body;
-
-//   if (!/^[0-9]{10}$/.test(mobile)) {
-//     return res.status(400).json({ message: "Invalid mobile" });
-//   }
-
-//   const existingUser = await User.findOne({ mobile });
-//   if (existingUser) {
-//     return res.status(400).json({ message: "Mobile number already registered. Please login" });
-//   }
-
-//   const otp       = Math.floor(1000 + Math.random() * 9000).toString();
-//   const hashedOtp = await bcrypt.hash(otp, 10);
-
-//   await Otp.findOneAndUpdate(
-//     { mobile },
-//     { $set: { otp: hashedOtp, isVerified: false, expiresAt: Date.now() + 2 * 60 * 1000 } },
-//     { upsert: true, returnDocument: "after" }
-//   );
-
-//   console.log("OTP:", otp);
-//   res.json({ message: "OTP sent", otp });
-// };
 exports.sendOtp = async (req, res) => {
-  try {
-    const { mobile } = req.body;
+  const { mobile } = req.body;
 
-    if (!/^[0-9]{10}$/.test(mobile)) {
-      return res.status(400).json({
-        message: "Invalid mobile number",
-      });
-    }
-
-    const existingUser = await User.findOne({ mobile });
-
-    if (existingUser) {
-      return res.status(400).json({
-        message: "Mobile number already registered. Please login",
-      });
-    }
-
-    const response = await axios.post(
-      "https://control.msg91.com/api/v5/otp",
-      {
-        mobile: `91${mobile}`,
-        template_id: process.env.MSG91_TEMPLATE_ID,
-        authkey: process.env.MSG91_AUTHKEY,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    console.log("MSG91:", response.data);
-
-    return res.status(200).json({
-      message: "OTP sent successfully",
-      request_id: response.data.request_id,
-    });
-
-  } catch (err) {
-    console.log(err.response?.data || err.message);
-
-    return res.status(500).json({
-      message: "Failed to send OTP",
-      error: err.response?.data || err.message,
-    });
+  if (!/^[0-9]{10}$/.test(mobile)) {
+    return res.status(400).json({ message: "Invalid mobile" });
   }
+
+  const existingUser = await User.findOne({ mobile });
+  if (existingUser) {
+    return res.status(400).json({ message: "Mobile number already registered. Please login" });
+  }
+
+  const otp       = Math.floor(1000 + Math.random() * 9000).toString();
+  const hashedOtp = await bcrypt.hash(otp, 10);
+
+  await Otp.findOneAndUpdate(
+    { mobile },
+    { $set: { otp: hashedOtp, isVerified: false, expiresAt: Date.now() + 2 * 60 * 1000 } },
+    { upsert: true, returnDocument: "after" }
+  );
+
+  console.log("OTP:", otp);
+  res.json({ message: "OTP sent", otp });
 };
 
 // ================= set pin =================
@@ -608,7 +560,6 @@ exports.resetSendOtp = async (req, res) => {
   console.log("OTP:", otp);
   res.json({ message: "OTP sent", otp });
 };
-
 
 
 // const bcrypt = require("bcrypt");
