@@ -14,7 +14,6 @@ const connectDB = require("./config/db");
 const websocketManager = require("./utils/websocketManager");
 const binanceWebSocket = require("./services/binanceWebSocketService");
 const realtimePriceCache = require("./cache/realtimePriceCache");
-const newsService = require("./services/newsService"); 
 
 // cron
 require("./cron/walletCron");
@@ -28,9 +27,6 @@ const updateMarketCache = require("./services/marketUpdater");
 const bankRoutes = require("./routes/wallet/bankRoutes");
 const tradingRoutes = require('./routes/trading/tradingRoutes');
 const kycRoutes= require("./routes/kyc/kycRoutes");
-const newsRoutes=require("./routes/news/newsRoutes");
-const cashfreeRoutes = require("./routes/wallet/cashfreeRoutes");
-
 const adminKycRoutes = require("./routes/admin/adminKycRoutes");
 const adminAuthRoutes = require("./routes/admin/adminAuthRoutes");
 const adminStatsRoutes = require("./routes/admin/adminStatsRoutes");
@@ -99,8 +95,7 @@ app.use("/api/bank", bankRoutes);
 app.use("/api/trading", tradingRoutes);
 app.use("/api/kyc",kycRoutes);
 app.use("/api/admin/kyc",adminKycRoutes);
-app.use("/api/news",newsRoutes);
-app.use("/api/cashfree", cashfreeRoutes);
+
 // ── Admin routes ──────────────────────────────────────────────────────────────
 app.use("/api/admin/auth", adminAuthRoutes);               // login, create admin, users
 app.use("/api/admin/stats", adminStatsRoutes);             // dashboard widget stats
@@ -125,7 +120,7 @@ app.get("/health", (req, res) => {
 // Initialize WebSocket Server for client connections
 const wss = new WebSocket.Server({ server });
 websocketManager.initialize(wss);
-newsService.startLiveNews();
+
 // Start Server
 const PORT = process.env.PORT || 3001;
 
