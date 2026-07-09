@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PAYO - Firebase Phone Auth Test Page</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 700px;
+    margin: 40px auto;
+    padding: 0 20px;
+    line-height: 1.6;
+    color: #222;
+  }
+  h1 { font-size: 22px; }
+  .step {
+    background: #f5f5f7;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+  }
+  .step h3 { margin-top: 0; }
+  input {
+    padding: 8px 10px;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    width: 220px;
+    margin-right: 8px;
+  }
+  button {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 15px;
+  }
+  button:hover { background: #1e4fc4; }
+  button:disabled { background: #aaa; cursor: not-allowed; }
+  #token-box, #status {
+    background: #111;
+    color: #0f0;
+    padding: 12px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 13px;
+    word-break: break-all;
+    white-space: pre-wrap;
+    min-height: 20px;
+    margin-top: 10px;
+  }
+  #recaptcha-container { margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>PAYO — Firebase Phone Auth Test Page</h1>
+<p>This performs a REAL phone sign-in using Firebase — an actual SMS will be sent to the number you enter.
+Use your own real phone number for this test.</p>
+
+<div class="step">
+  <h3>Step 1 — Fill in your Firebase config near the bottom of this file</h3>
+  <p>Same config you used for the FCM test page (Project Settings → General → Your apps → web app).
+  Phone Auth does not need a VAPID key.</p>
+</div>
+
+<div class="step">
+  <h3>Step 2 — Enter phone number (with country code) and send OTP</h3>
+  <input type="text" id="phoneInput" placeholder="+919876543210" />
+  <button id="sendOtpBtn">Send OTP</button>
+  <div id="recaptcha-container"></div>
+  <div id="status">(status will appear here)</div>
+</div>
+
+<div class="step">
+  <h3>Step 3 — Enter the OTP you received via real SMS</h3>
+  <input type="text" id="otpInput" placeholder="123456" />
+  <button id="verifyOtpBtn" disabled>Verify OTP</button>
+</div>
+
+<div class="step">
+  <h3>Step 4 — Copy this ID token into Postman</h3>
+  <p>Use it as the <code>idToken</code> value when calling <code>POST /auth/verify-firebase-token</code>.</p>
+  <div id="token-box">(ID token will appear here after successful verification)</div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getAuth,
+    RecaptchaVerifier,
+    signInWithPhoneNumber
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // ── STEP 1: paste your values here ─────────────────────────────
+  const firebaseConfig = {
+    apiKey: "AIzaSyDSYvGTu-WfppLkUHg8DAUi_7EXwv5zIXE",
+    authDomain: "payo-45782.firebaseapp.com",
+    projectId: "payo-45782",
+    storageBucket: "payo-45782.firebasestorage.app",
+    messagingSenderId: "504020887035",
+    appId: "1:504020887035:web:4c3285f8d8e279bc7cd75e",
+  };
+  // ────────────────────────────────────────────────────────────────
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  const statusBox = document.getElementById("status");
+  const tokenBox = document.getElementById("token-box");
+  const sendBtn = document.getElementById("sendOtpBtn");
+  const verifyBtn = document.getElementById("verifyOtpBtn");
+
+  let confirmationResult = null;
+
+  window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+    size: "normal",
+  });
+
+  sendBtn.addEventListener("click", async () => {
+    const phoneNumber = document.getElementById("phoneInput").value.trim();
+    if (!phoneNumber.startsWith("+")) {
+      statusBox.textContent = "Enter number in international format, e.g. +919876543210";
+      return;
+    }
+
+    try {
+      sendBtn.disabled = true;
+      statusBox.textContent = "Sending OTP via Firebase...";
+      confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
+      statusBox.textContent = "OTP sent! Check your phone for the real SMS.";
+      verifyBtn.disabled = false;
+    } catch (err) {
+      statusBox.textContent = "Error sending OTP: " + err.message;
+      console.error(err);
+    } finally {
+      sendBtn.disabled = false;
+    }
+  });
+
+  verifyBtn.addEventListener("click", async () => {
+    const otp = document.getElementById("otpInput").value.trim();
+    if (!confirmationResult) {
+      statusBox.textContent = "Send OTP first.";
+      return;
+    }
+
+    try {
+      statusBox.textContent = "Verifying OTP...";
+      const result = await confirmationResult.confirm(otp);
+      const idToken = await result.user.getIdToken();
+      tokenBox.textContent = idToken;
+      statusBox.textContent = "Phone verified successfully! Copy the ID token below.";
+    } catch (err) {
+      statusBox.textContent = "Error verifying OTP: " + err.message;
+      console.error(err);
+    }
+  });
+</script>
+
+</body>
+</html>

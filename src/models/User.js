@@ -48,9 +48,6 @@ const userSchema = new mongoose.Schema({
   },
 
   // ── ADDED FOR ROLE-BASED ACCESS CONTROL ──────────────────────────────────
-  // Only set when role === "admin". null for regular users.
-  // super_admin is the hardcoded env-var admin — never stored in DB.
-  // All sub-admins created via API must have one of the other three values.
   adminRole: {
     type: String,
     enum: ["super_admin", "kyc_admin", "operations_admin", "support_admin"],
@@ -67,6 +64,15 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+
+  // ── NEW: FOR FIREBASE CLOUD MESSAGING (OTP push delivery) ────────────────
+  // Set via /auth/save-fcm-token after login, or refreshed by the app
+  // whenever Firebase issues a new token for the device.
+  fcmToken: {
+    type: String,
+    default: null,
+  },
+  // ─────────────────────────────────────────────────────────────────────────
 });
 
 module.exports = mongoose.model("User", userSchema);
