@@ -1,6 +1,8 @@
 const bcrypt = require("bcrypt");
 const jwt    = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
+const sql = require("mssql");
+const connectDB = require("../../config/db");
 
 const User        = require("../../models/User");
 const Otp         = require("../../models/Otp");
@@ -13,158 +15,75 @@ const { generateWalletAddress, generateQR } = require("../../utils/helpers");
 // ======================register========================
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, confirmpassword, referralCode } = req.body;
+    const { userId, name, email, referralCode } = req.body;
 
-    // ── Token ──────────────────────────────────────────────
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "No token or invalid format" });
-    }
-    const token   = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, "mysecretkey");
-    const mobile  = decoded.mobile;
-
-    if (!mobile) {
-      return res.status(400).json({ message: "Mobile missing" });
-    }
-
-    // ── Validations ────────────────────────────────────────
-    if (!name || !email || !password || !confirmpassword) {
-      return res.status(400).json({ message: "All fields required" });
-    }
-
-    if (typeof name !== "string" || name.trim().length < 3) {
-      return res.status(400).json({ message: "Name must contain minimum 3 characters" });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: "Invalid email format. Example: user@gmail.com" });
-    }
-
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!passwordRegex.test(password)) {
+    // Validation
+    if (!userId) {
       return res.status(400).json({
-        message: "Use 8+ chars with uppercase, lowercase, number & special character",
+        status: "0",
+        message: "UserId is required"
       });
     }
 
-    if (password !== confirmpassword) {
-      return res.status(400).json({ message: "Passwords mismatch" });
-    }
-
-    const existEmail = await User.findOne({ email });
-    if (existEmail) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
-
-    const existMobile = await User.findOne({ mobile });
-    if (existMobile) {
-      return res.status(400).json({ message: "Mobile number already exists" });
-    }
-
-    const otpRecord = await Otp.findOne({ mobile, isVerified: true });
-    if (!otpRecord) {
-      return res.status(400).json({ message: "OTP not verified" });
-    }
-
-    // ── Referral check ─────────────────────────────────────
-    let referrer = null;
-    if (referralCode) {
-      referrer = await User.findOne({ myReferralCode: referralCode });
-      if (!referrer) {
-        return res.status(400).json({ message: "Invalid referral code" });
-      }
-    }
-
-    // ── Create user ────────────────────────────────────────
-    const hash       = await bcrypt.hash(password, 10);
-    const myReferral = "PAYO" + uuidv4().slice(0, 6);
-
-    const user = await User.create({
-      name,
-      email,
-      password: hash,
-      mobile,
-      referredBy:      referralCode || null,
-      myReferralCode:  myReferral,
-      isVerified:      true,
-      // KYC starts as false — only true after admin approves
-      kycVerified:     false,
-      walletActivated: false,
-    });
-
-    await sendNotification({
-      userId:  user._id,
-      title:   "Welcome to PAYO",
-      message: "Please complete KYC to activate your wallet",
-      type:    "SYSTEM",
-    });
-
-    // ── Create wallet ──────────────────────────────────────
-    const walletAddress = generateWalletAddress();
-    const qr            = await generateQR(walletAddress);
-
-    const wallet = await Wallet.create({
-      userId:        user._id,
-      walletAddress: generateWalletAddress(),
-      addressExpiry: Date.now() + 60 * 60 * 1000,
-      qrToken:       uuidv4(),
-      qrExpiry:      Date.now() + 15 * 60 * 1000,
-    });
-
-    await User.findByIdAndUpdate(user._id, { walletId: wallet._id });
-
-    // ── Referral bonus ─────────────────────────────────────
-    const REFERRAL_BONUS = 50;
-    if (referralCode && referrer) {
-      if (referrer._id.toString() === user._id.toString()) {
-        return res.status(400).json({ message: "You cannot refer yourself" });
-      }
-
-      const referrerWallet = await Wallet.findOne({ userId: referrer._id });
-      if (!referrerWallet) {
-        return res.status(404).json({ message: "Referrer wallet not found" });
-      }
-
-      referrerWallet.balance += REFERRAL_BONUS;
-      await referrerWallet.save();
-
-      await Transaction.create({
-        userId:  referrer._id,
-        amount:  REFERRAL_BONUS,
-        type:    "credit",
-        message: "Referral bonus received",
-      });
-
-      await sendNotification({
-        userId:  referrer._id,
-        title:   "Referral Reward",
-        message: `You earned ${REFERRAL_BONUS} PAYO`,
-        type:    "REWARD",
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        status: "0",
+        message: "Name is required"
       });
     }
 
-    // ── Cleanup ────────────────────────────────────────────
-    await Otp.deleteOne({ mobile });
+    const pool = await connectDB();
 
-    // ── Response ───────────────────────────────────────────
-    res.status(201).json({
-      message:        "Registered successfully. Please complete KYC to access the app.",
-      myReferralCode: user.myReferralCode,
-      kycRequired:    true,         // ← tells the app to go to KYC screen
-      wallet: {
-        walletAddress: wallet.walletAddress,
-        balance:       wallet.balance,
-      },
+    const request = pool.request();
+
+    request.input("uid", sql.VarChar(10), String(userId));
+    request.input("fname", sql.VarChar(500), name.trim());
+    request.input("email", sql.VarChar(500), email || "");
+    request.input("referedby", sql.VarChar(500), referralCode || "");
+
+    const result = await request.execute("USP_User_Registrations_Phase2");
+   
+    // Search every recordset for Result column
+    let sqlResponse = null;
+
+    for (let i = 0; i < result.recordsets.length; i++) {
+      const rs = result.recordsets[i];
+
+      if (
+        Array.isArray(rs) &&
+        rs.length > 0 &&
+        rs[0] &&
+        rs[0].Result
+      ) {
+        sqlResponse = JSON.parse(rs[0].Result);
+        break;
+      }
+    }
+
+    if (!sqlResponse) {
+      return res.status(500).json({
+        status: "0",
+        message: "Stored Procedure returned no response"
+      });
+    }
+
+    return res.status(200).json({
+      status: sqlResponse.Status,
+      message: sqlResponse.Message,
+      userId: sqlResponse.UserId || null,
+      fullName: sqlResponse.FullName || null,
+      email: sqlResponse.Email || null,
+      referredByUserId: sqlResponse.ReferedByUserId || null
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server Error" });
+
+    return res.status(500).json({
+      status: "0",
+      message: err.message
+    });
   }
 };
-
 // ======================login========================
 // ── KEY CHANGE: checks KYC status and tells app where to send user ──────────
 exports.login = async (req, res) => {
@@ -299,78 +218,163 @@ exports.verifyLoginOtp = async (req, res) => {
   }
 };
 
-// ======================resend otp========================
+// ====================== resend otp ======================
 exports.resendOtp = async (req, res) => {
-  const { mobile } = req.body;
+  try {
 
-  const record = await Otp.findOne({ mobile });
-  if (!record) return res.status(400).json({ message: "Please request OTP first" });
+    const { mobile, countryCode } = req.body;
 
-  const now = Date.now();
-  if (record.expiresAt > now) {
-    return res.status(400).json({ message: "OTP still valid. Please wait before resending" });
+    if (!mobile || !countryCode) {
+      return res.status(400).json({
+        status: "400",
+        message: "Mobile number and country code are required."
+      });
+    }
+
+    const pool = await connectDB();
+
+    const result = await pool
+      .request()
+      .input("mobile", sql.VarChar(20), mobile)
+      .input("mobile_country_Code", sql.VarChar(10), countryCode)
+      .input("action", sql.VarChar(20), "RESEND_OTP")
+      .execute("USP_User_Resigtrations_Phase1");
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(500).json({
+        status: "500",
+        message: "No response received from SQL Server."
+      });
+    }
+
+    const jsonColumn = Object.keys(result.recordset[0])[0];
+    const response = JSON.parse(result.recordset[0][jsonColumn]);
+
+    return res.status(Number(response.Status)).json({
+      status: response.Status,
+      message: response.Message,
+      userId: response.UserId,
+      otp: response.OTP,
+      errorNumber: response.ErrorNumber
+    });
+
+  } catch (err) {
+
+    return res.status(500).json({
+      status: "500",
+      message: err.message
+    });
+
   }
-
-  const otp       = Math.floor(1000 + Math.random() * 9000).toString();
-  const hashedOtp = await bcrypt.hash(otp, 10);
-
-  record.otp        = hashedOtp;
-  record.isVerified = false;
-  record.expiresAt  = now + 2 * 60 * 1000;
-  await record.save();
-
-  console.log("New OTP:", otp);
-  res.json({ message: "OTP resent", otp });
 };
-
 // ====================verify otp========================
 exports.verifyOtp = async (req, res) => {
   try {
-    const { mobile, otp } = req.body;
-    const record = await Otp.findOne({ mobile });
 
-    if (!record || !record.otp) return res.status(400).json({ message: "OTP not found" });
-    if (record.expiresAt < Date.now()) return res.status(400).json({ message: "Expired OTP" });
+    const { userId, otp } = req.body;
 
-    const isMatch = await bcrypt.compare(String(otp).trim(), record.otp);
-    if (!isMatch) return res.status(400).json({ message: "Invalid OTP" });
+    if (!userId || !otp) {
+      return res.status(400).json({
+        status: "0",
+        message: "UserId and OTP are required."
+      });
+    }
 
-    record.isVerified = true;
-    await record.save();
+    const pool = await connectDB();
 
-    const token = jwt.sign({ mobile }, "mysecretkey", { expiresIn: "24h" });
-    return res.json({ message: "OTP verified", token });
+    const result = await pool
+      .request()
+      .input("uid", sql.BigInt, userId)
+      .input("otp", sql.VarChar(20), otp)
+      .input("otp_type", sql.VarChar(20), "R")
+      .input("identifier", sql.VarChar(20), "M")
+      .execute("USP_VerifyOTP");
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(500).json({
+        status: "0",
+        message: "No response received from SQL Server."
+      });
+    }
+
+    // Parse SQL JSON
+    const jsonColumn = Object.keys(result.recordset[0])[0];
+    const response = JSON.parse(result.recordset[0][jsonColumn]);
+
+    if (response.Status === "0") {
+      return res.status(400).json(response);
+    }
+
+    // Don't generate JWT here
+    return res.status(200).json({
+      status: response.Status,
+      message: response.Message,
+      userId: response.UserId
+    });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+
+    return res.status(500).json({
+      status: "0",
+      message: err.message
+    });
+
   }
 };
 
 // ======================send otp========================
 exports.sendOtp = async (req, res) => {
-  const { mobile } = req.body;
+  try {
+    const { mobile, countryCode } = req.body;
 
-  if (!/^[0-9]{10}$/.test(mobile)) {
-    return res.status(400).json({ message: "Invalid mobile" });
+    if (!mobile || !countryCode) {
+      return res.status(400).json({
+        message: "Mobile number and country code are required."
+      });
+    }
+
+    const pool = await connectDB();
+
+    const result = await pool
+      .request()
+      .input("mobile", sql.VarChar(20), mobile)
+      .input("mobile_country_Code", sql.VarChar(10), countryCode)
+      .execute("USP_User_Resigtrations_Phase1");
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(500).json({
+        message: "No response received from SQL Server."
+      });
+    }
+    // Since SP returns FOR JSON PATH
+    const jsonColumn = Object.keys(result.recordset[0])[0];
+    const response = JSON.parse(result.recordset[0][jsonColumn]);
+
+    if (response.Status === "0") {
+      return res.status(400).json({
+        status: response.Status,
+        message: response.Message,
+        userId: response.UserId,
+        otp: response.OTP,
+        errorNumber: response.ErrorNumber
+      });
+    }
+
+    return res.status(200).json({
+      status: response.Status,
+      message: response.Message,
+      userId: response.UserId,
+      otp: response.OTP
+    });
+
+  } catch (error) {
+    console.error("Send OTP Error:", error);
+
+    return res.status(500).json({
+      message: "Server Error",
+      error: error.message
+    });
   }
-
-  const existingUser = await User.findOne({ mobile });
-  if (existingUser) {
-    return res.status(400).json({ message: "Mobile number already registered. Please login" });
-  }
-
-  const otp       = Math.floor(1000 + Math.random() * 9000).toString();
-  const hashedOtp = await bcrypt.hash(otp, 10);
-
-  await Otp.findOneAndUpdate(
-    { mobile },
-    { $set: { otp: hashedOtp, isVerified: false, expiresAt: Date.now() + 2 * 60 * 1000 } },
-    { upsert: true, returnDocument: "after" }
-  );
-
-  console.log("OTP:", otp);
-  res.json({ message: "OTP sent", otp });
 };
 
 // ================= set pin =================
