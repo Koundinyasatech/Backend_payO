@@ -84,140 +84,212 @@ exports.register = async (req, res) => {
     });
   }
 };
+
 // ======================login========================
 // ── KEY CHANGE: checks KYC status and tells app where to send user ──────────
+// exports.login = async (req, res) => {
+//   try {
+//     const { email, mobile, password } = req.body;
+
+//     // find user
+//     const user = email
+//       ? await User.findOne({ email })
+//       : await User.findOne({ mobile });
+
+//     if (!user) return res.status(400).json({ message: "User not found" });
+
+//     // check password
+//     const match = await bcrypt.compare(password, user.password);
+//     if (!match) return res.status(400).json({ message: "Wrong password" });
+
+//     // ── KYC STATUS CHECK ──────────────────────────────────────────────────
+//     // Check KYC record to know the exact status
+//     const kyc = await Kyc.findOne({ userId: user._id });
+
+//     const kycStatus = kyc ? kyc.status : "not_started";
+
+//     // Block login ONLY if KYC was rejected (they must retry)
+//     // Allow login for not_started, documents_uploaded, under_review, approved
+//     if (kycStatus === "rejected") {
+//       return res.status(403).json({
+//         message:   "Your KYC verification failed. Please retry.",
+//         kycStatus: "rejected",
+//         action:    "retry_kyc",  // tells app to show retry screen
+//       });
+//     }
+
+//     // generate token
+//     const token = jwt.sign(
+//       { id: user._id, mobile: user.mobile },
+//       "mysecretkey",
+//       { expiresIn: "24h" } 
+//     );
+
+//     await sendNotification({
+//       userId:  user._id,
+//       title:   "Login Alert",
+//       message: "You logged into your account",
+//       type:    "SECURITY",
+//     });
+
+//     // ── Tell the app exactly where to navigate ────────────────────────────
+//     let redirectTo = "home"; // default — KYC approved, full access
+
+//     if (kycStatus === "not_started") {
+//       redirectTo = "kyc_upload";      // → go to Screen 1 (upload docs)
+//     } else if (kycStatus === "documents_uploaded" || kycStatus === "under_review") {
+//       redirectTo = "kyc_under_review"; // → go to Screen 4 (waiting)
+//     } else if (kycStatus === "approved") {
+//       redirectTo = "home";             // → full app access
+//     }
+
+//     res.json({
+//       message:   "Login success",
+//       token,
+//       kycStatus,
+//       redirectTo,  // ← front-end uses this to navigate to correct screen
+//       user: {
+//         id:              user._id,
+//         name:            user.name,
+//         email:           user.email,
+//         mobile:          user.mobile,
+//         kycVerified:     user.kycVerified,
+//         walletActivated: user.walletActivated,
+//       },
+//     });
+
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// };
 exports.login = async (req, res) => {
   try {
-    const { email, mobile, password } = req.body;
+    const { mobile, mobile_cont_code } = req.body;
 
-    // find user
-    const user = email
-      ? await User.findOne({ email })
-      : await User.findOne({ mobile });
-
-    if (!user) return res.status(400).json({ message: "User not found" });
-
-    // check password
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ message: "Wrong password" });
-
-    // ── KYC STATUS CHECK ──────────────────────────────────────────────────
-    // Check KYC record to know the exact status
-    const kyc = await Kyc.findOne({ userId: user._id });
-
-    const kycStatus = kyc ? kyc.status : "not_started";
-
-    // Block login ONLY if KYC was rejected (they must retry)
-    // Allow login for not_started, documents_uploaded, under_review, approved
-    if (kycStatus === "rejected") {
-      return res.status(403).json({
-        message:   "Your KYC verification failed. Please retry.",
-        kycStatus: "rejected",
-        action:    "retry_kyc",  // tells app to show retry screen
+    if (!mobile || !mobile_cont_code) {
+      return res.status(400).json({
+        status: "400",
+        message: "Mobile number and country code are required."
       });
     }
 
-    // generate token
-    const token = jwt.sign(
-      { id: user._id, mobile: user.mobile },
-      "mysecretkey",
-      { expiresIn: "24h" } 
-    );
+    const pool = await connectDB();
 
-    await sendNotification({
-      userId:  user._id,
-      title:   "Login Alert",
-      message: "You logged into your account",
-      type:    "SECURITY",
-    });
+    const result = await pool
+      .request()
+      .input("mobile", sql.VarChar(20), mobile)
+      .input("mobile_cont_code", sql.VarChar(10), mobile_cont_code)
+      .execute("USP_User_Login");
 
-    // ── Tell the app exactly where to navigate ────────────────────────────
-    let redirectTo = "home"; // default — KYC approved, full access
-
-    if (kycStatus === "not_started") {
-      redirectTo = "kyc_upload";      // → go to Screen 1 (upload docs)
-    } else if (kycStatus === "documents_uploaded" || kycStatus === "under_review") {
-      redirectTo = "kyc_under_review"; // → go to Screen 4 (waiting)
-    } else if (kycStatus === "approved") {
-      redirectTo = "home";             // → full app access
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(500).json({
+        status: "500",
+        message: "No response received from SQL Server."
+      });
     }
 
-    res.json({
-      message:   "Login success",
-      token,
-      kycStatus,
-      redirectTo,  // ← front-end uses this to navigate to correct screen
-      user: {
-        id:              user._id,
-        name:            user.name,
-        email:           user.email,
-        mobile:          user.mobile,
-        kycVerified:     user.kycVerified,
-        walletActivated: user.walletActivated,
-      },
+    const jsonColumn = Object.keys(result.recordset[0])[0];
+    const response = JSON.parse(result.recordset[0][jsonColumn]);
+
+    if (response.Status === "0") {
+      return res.status(400).json(response);
+    }
+
+    return res.status(200).json(response);
+
+  } catch (error) {
+
+    return res.status(500).json({
+      status: "500",
+      message: error.message
     });
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
   }
 };
 
-// ======================verify login otp========================
+// ================= VERIFY LOGIN OTP =================
 exports.verifyLoginOtp = async (req, res) => {
   try {
+ 
+    // Get mobile number and OTP from request
     const { mobile, otp } = req.body;
-
-    const record = await Otp.findOne({ mobile });
-    if (!record) return res.status(400).json({ message: "OTP not found" });
-
-    if (record.expiresAt < Date.now()) {
-      return res.status(400).json({ message: "OTP expired" });
-    }
-
-    const isMatch = await bcrypt.compare(otp, record.otp);
-    if (!isMatch) return res.status(400).json({ message: "Invalid OTP" });
-
-    const user = await User.findOne({ mobile });
-    if (!user) return res.status(400).json({ message: "User not found" });
-
-    // ── Same KYC check as normal login ────────────────────────────────────
-    const kyc       = await Kyc.findOne({ userId: user._id });
-    const kycStatus = kyc ? kyc.status : "not_started";
-
-    if (kycStatus === "rejected") {
-      return res.status(403).json({
-        message:   "Your KYC verification failed. Please retry.",
-        kycStatus: "rejected",
-        action:    "retry_kyc",
+ 
+    // Validate required fields
+    if (!mobile || !otp) {
+      return res.status(400).json({
+        message: "Mobile number and OTP are required"
       });
     }
-
+ 
+    // Connect to SQL Server
+    const pool = await connectDB();
+ 
+    // Execute Verify OTP Stored Procedure
+    const result = await pool
+      .request()
+      .input("mobile", sql.VarChar(20), mobile)
+      .input("otp", sql.VarChar(10), otp)
+      .input("otp_type", sql.VarChar(20), "L")      // L = Login OTP
+      .input("identifier", sql.VarChar(20), "M")    // M = Mobile
+      .execute("USP_VerifyOTP");
+ 
+    console.log("Verify OTP Result:", result.recordset);
+ 
+    // Check if SP returned data
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(500).json({
+        message: "No response received from SQL Server"
+      });
+    }
+ 
+    // Parse JSON returned by FOR JSON PATH
+    const jsonColumn = Object.keys(result.recordset[0])[0];
+    const response = JSON.parse(result.recordset[0][jsonColumn]);
+ 
+    console.log("Parsed Response:", response);
+ 
+    // SP returns 200 on success, 0/400 on failure
+    if (response.Status !== "200") {
+      return res.status(400).json({
+        status: response.Status,
+        message: response.Message,
+        errorNumber: response.ErrorNumber
+      });
+    }
+ 
+    // Generate JWT token
     const token = jwt.sign(
-      { id: user._id, mobile: user.mobile },
+      {
+        id: response.UserId,
+        mobile
+      },
       "mysecretkey",
       { expiresIn: "24h" }
     );
-
-    await Otp.deleteOne({ mobile });
-
-    let redirectTo = "home";
-    if (kycStatus === "not_started")                                      redirectTo = "kyc_upload";
-    else if (kycStatus === "documents_uploaded" || kycStatus === "under_review") redirectTo = "kyc_under_review";
-    else if (kycStatus === "approved")                                    redirectTo = "home";
-
-    res.json({
-      message: "Login success via OTP",
+ 
+    return res.status(200).json({
+      status: response.Status,
+      message: response.Message,
       token,
-      kycStatus,
-      redirectTo,
+      user: {
+        userId: response.UserId,
+        mobile
+      }
     });
-
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
+ 
+  } catch (error) {
+ 
+    console.error("Verify OTP Error:", error);
+ 
+    return res.status(500).json({
+      message: "Server Error",
+      error: error.message
+    });
+ 
   }
 };
-
+ 
 // ====================== resend otp ======================
 exports.resendOtp = async (req, res) => {
   try {
@@ -267,6 +339,7 @@ exports.resendOtp = async (req, res) => {
 
   }
 };
+
 // ====================verify otp========================
 exports.verifyOtp = async (req, res) => {
   try {
@@ -380,23 +453,111 @@ exports.sendOtp = async (req, res) => {
 // ================= set pin =================
 exports.setPin = async (req, res) => {
   try {
-    const { pin } = req.body;
 
-    if (!pin) return res.status(400).json({ message: "PIN is required" });
-    if (!/^\d{4}$/.test(pin)) return res.status(400).json({ message: "PIN must be 4 digits" });
-    if (!req.userId) return res.status(401).json({ message: "Invalid token (no userId)" });
+    const {
+      userId,
+      pin,
+      ipAddress,
+      deviceId,
+      deviceName,
+      userAgent,
+      location
+    } = req.body;
 
-    const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    // ================= Validation =================
 
-    user.transactionPin = await bcrypt.hash(pin, 10);
-    await user.save();
+    if (!userId) {
+      return res.status(400).json({
+        status: "400",
+        message: "UserId is required."
+      });
+    }
 
-    res.json({ message: "Transaction PIN set successfully" });
+    if (!pin) {
+      return res.status(400).json({
+        status: "400",
+        message: "Transaction PIN is required."
+      });
+    }
+
+    if (!/^\d{4}$/.test(pin)) {
+      return res.status(400).json({
+        status: "400",
+        message: "PIN must be exactly 4 digits."
+      });
+    }
+
+    if (!ipAddress) {
+      return res.status(400).json({
+        status: "400",
+        message: "IP Address is required."
+      });
+    }
+
+    if (!deviceId) {
+      return res.status(400).json({
+        status: "400",
+        message: "Device Id is required."
+      });
+    }
+
+    if (!deviceName) {
+      return res.status(400).json({
+        status: "400",
+        message: "Device Name is required."
+      });
+    }
+
+    if (!userAgent) {
+      return res.status(400).json({
+        status: "400",
+        message: "User Agent is required."
+      });
+    }
+
+    if (!location) {
+      return res.status(400).json({
+        status: "400",
+        message: "Location is required."
+      });
+    }
+
+    const pool = await connectDB();
+
+    const request = pool.request();
+
+    request.input("uid", sql.VarChar(10), String(userId));
+    request.input("tpin", sql.VarChar(10), pin);
+    request.input("ipadd", sql.VarChar(500), ipAddress);
+    request.input("deviceid", sql.VarChar(500), deviceId);
+    request.input("devicename", sql.VarChar(500), deviceName);
+    request.input("user_agent", sql.VarChar(500), userAgent);
+    request.input("Location", sql.VarChar(5000), location);
+
+    const result = await request.execute(
+      "USP_User_Tpin_Mpin_Registration"
+    );
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(500).json({
+        status: "500",
+        message: "No response received from SQL Server."
+      });
+    }
+
+    const response = JSON.parse(result.recordset[0].Result);
+
+    return res
+      .status(Number(response.Status))
+      .json(response);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error setting PIN" });
+
+    return res.status(500).json({
+      status: "500",
+      message: err.message
+    });
+
   }
 };
 
@@ -429,64 +590,127 @@ exports.changePin = async (req, res) => {
   }
 };
 
-// ================= send login otp =================
-exports.sendLoginOtp = async (req, res) => {
-  const { mobile } = req.body;
+// ================= Send Login OTP =================
+// exports.sendLoginOtp = async (req, res) => {
+//   try {
+// console.log("Headers:", req.headers);
+//     console.log("Body:", req.body);
 
-  const user = await User.findOne({ mobile });
-  if (!user) return res.status(400).json({ message: "User not registered" });
+//     const { mobile, mobile_cont_code } = req.body;
 
-  const otp       = Math.floor(1000 + Math.random() * 9000).toString();
-  const hashedOtp = await bcrypt.hash(otp, 10);
+//     // Validation
+//     if (!mobile || !mobile_cont_code) {
+//       return res.status(400).json({
+//         status: "400",
+//         message: "Mobile number and country code are required."
+//       });
+//     }
 
-  await Otp.findOneAndUpdate(
-    { mobile },
-    { otp: hashedOtp, isVerified: false, expiresAt: Date.now() + 2 * 60 * 1000 },
-    { upsert: true, returnDocument: "after" }
-  );
+//     const pool = await connectDB();
 
-  console.log("Login OTP:", otp);
-  res.json({ message: "OTP sent", otp });
-};
+//     const result = await pool
+//       .request()
+//       .input("mobile", sql.VarChar(20), mobile)
+//       .input("mobile_cont_code", sql.VarChar(10), mobile_cont_code)
+//       .execute("USP_User_Login");
 
-// ================= resend login otp =================
+//     console.log("Send Login OTP SQL Result:", result.recordset);
+
+//     if (!result.recordset || result.recordset.length === 0) {
+//       return res.status(500).json({
+//         status: "500",
+//         message: "No response received from SQL Server."
+//       });
+//     }
+
+//     const jsonColumn = Object.keys(result.recordset[0])[0];
+//     const response = JSON.parse(result.recordset[0][jsonColumn]);
+
+//     console.log("Send Login OTP Response:", response);
+
+//     if (response.Status !== "1") {
+//       return res.status(Number(response.Status)).json(response);
+//     }
+
+//     return res.status(200).json(response);
+
+//   } catch (err) {
+
+//     console.error("Send Login OTP Error:", err);
+
+//     return res.status(500).json({
+//       status: "500",
+//       message: err.message
+//     });
+
+//   }
+// };
+
+// ================= RESEND LOGIN OTP =================
 exports.resendLoginOtp = async (req, res) => {
   try {
-    const { mobile } = req.body;
 
-    if (!mobile || !/^[0-9]{10}$/.test(mobile)) {
-      return res.status(400).json({ message: "Valid mobile required" });
+    const { mobile, mobile_cont_code } = req.body;
+
+    // Validation
+    if (!mobile || !mobile_cont_code) {
+      return res.status(400).json({
+        status: "400",
+        message: "Mobile number and country code are required."
+      });
     }
 
-    const user = await User.findOne({ mobile });
-    if (!user) return res.status(400).json({ message: "User not registered" });
+    const pool = await connectDB();
 
-    const record = await Otp.findOne({ mobile });
-    const now    = Date.now();
+    const result = await pool
+      .request()
+      .input("mobile", sql.VarChar(20), mobile.trim())
+      .input("mobile_cont_code", sql.VarChar(10), mobile_cont_code.trim())
+      .input("action", sql.VarChar(20), "RESEND_OTP")
+      .execute("USP_User_Login");
 
-    if (record && record.expiresAt > now) {
-      const secondsLeft = Math.floor((record.expiresAt - now) / 1000);
-      return res.status(400).json({ message: `Please wait ${secondsLeft}s before requesting new OTP` });
+    console.log("========== RESEND LOGIN OTP ==========");
+    console.log("Recordset:", result.recordset);
+    console.log("Recordsets:", result.recordsets);
+    console.log("RowsAffected:", result.rowsAffected);
+    console.log("Output:", result.output);
+    console.log("ReturnValue:", result.returnValue);
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(500).json({
+        status: "500",
+        message: "No response received from SQL Server."
+      });
     }
 
-    const otp       = Math.floor(1000 + Math.random() * 9000).toString();
-    const hashedOtp = await bcrypt.hash(otp, 10);
+    const jsonColumn = Object.keys(result.recordset[0])[0];
+    const response = JSON.parse(result.recordset[0][jsonColumn]);
 
-    await Otp.findOneAndUpdate(
-      { mobile },
-      { otp: hashedOtp, isVerified: false, expiresAt: now + 2 * 60 * 1000 },
-      { upsert: true, returnDocument: "after" }
-    );
+    console.log("Parsed Response:", response);
 
-    console.log("Resent Login OTP:", otp);
-    res.json({ message: "OTP resent successfully", otp });
+    return res
+      .status(response.Status === "1" ? 200 : Number(response.Status))
+      .json({
+        status: response.Status,
+        message: response.Message,
+        userId: response.UserId,
+        mobile: response.Mobile,
+        mobileCountryCode: response.Mobile_Country_Code,
+        otp: response.OTP,
+        errorNumber: response.ErrorNumber
+      });
 
   } catch (err) {
+
     console.error("RESEND LOGIN OTP ERROR:", err);
-    res.status(500).json({ message: "Server error" });
+
+    return res.status(500).json({
+      status: "500",
+      message: err.message
+    });
+
   }
 };
-
 // ================= reset password =================
 exports.resetPassword = async (req, res) => {
   try {
