@@ -211,82 +211,68 @@ exports.login = async (req, res) => {
 // ================= VERIFY LOGIN OTP =================
 exports.verifyLoginOtp = async (req, res) => {
   try {
- 
-    // Get mobile number and OTP from request
-    const { mobile, otp } = req.body;
- 
-    // Validate required fields
+
+    const {
+      mobile,
+      otp,
+      ipAddress,
+      deviceId,
+      deviceName,
+      userAgent,
+      location
+    } = req.body;
+
+    // Validation
     if (!mobile || !otp) {
       return res.status(400).json({
-        message: "Mobile number and OTP are required"
+        status: "400",
+        message: "Mobile number and OTP are required."
       });
     }
- 
-    // Connect to SQL Server
+
+    if (!ipAddress || !deviceId || !deviceName || !userAgent || !location) {
+      return res.status(400).json({
+        status: "400",
+        message: "Device information is required."
+      });
+    }
+
     const pool = await connectDB();
- 
-    // Execute Verify OTP Stored Procedure
+
     const result = await pool
       .request()
       .input("mobile", sql.VarChar(20), mobile)
-      .input("otp", sql.VarChar(10), otp)
-      .input("otp_type", sql.VarChar(20), "L")      // L = Login OTP
-      .input("identifier", sql.VarChar(20), "M")    // M = Mobile
+      .input("otp", sql.VarChar(20), otp)
+      .input("otp_type", sql.VarChar(20), "L")
+      .input("identifier", sql.VarChar(20), "M")
+      .input("ipadd", sql.VarChar(500), ipAddress)
+      .input("deviceid", sql.VarChar(5000), deviceId)
+      .input("devicename", sql.VarChar(5000), deviceName)
+      .input("user_agent", sql.VarChar(5000), userAgent)
+      .input("Location", sql.VarChar(5000), location)
       .execute("USP_VerifyOTP");
- 
-    console.log("Verify OTP Result:", result.recordset);
- 
-    // Check if SP returned data
+
     if (!result.recordset || result.recordset.length === 0) {
       return res.status(500).json({
-        message: "No response received from SQL Server"
+        status: "500",
+        message: "No response received from SQL Server."
       });
     }
- 
-    // Parse JSON returned by FOR JSON PATH
+
     const jsonColumn = Object.keys(result.recordset[0])[0];
     const response = JSON.parse(result.recordset[0][jsonColumn]);
- 
-    console.log("Parsed Response:", response);
- 
-    // SP returns 200 on success, 0/400 on failure
-    if (response.Status !== "200") {
-      return res.status(400).json({
-        status: response.Status,
-        message: response.Message,
-        errorNumber: response.ErrorNumber
-      });
-    }
- 
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        id: response.UserId,
-        mobile
-      },
-      "mysecretkey",
-      { expiresIn: "24h" }
-    );
- 
-    return res.status(200).json({
-      status: response.Status,
-      message: response.Message,
-      token,
-      user: {
-        userId: response.UserId,
-        mobile
-      }
-    });
- 
-  } catch (error) {
- 
-    console.error("Verify OTP Error:", error);
- 
+
+    return res
+      .status(Number(response.Status))
+      .json(response);
+
+  } catch (err) {
+
     return res.status(500).json({
-      message: "Server Error",
-      error: error.message
+      status: "500",
+      message: err.message
     });
- 
+
   }
 };
  
@@ -344,7 +330,7 @@ exports.resendOtp = async (req, res) => {
 exports.verifyOtp = async (req, res) => {
   try {
 
-    const { userId, otp } = req.body;
+    const { userId, otp, } = req.body;
 
     if (!userId || !otp) {
       return res.status(400).json({
@@ -356,12 +342,17 @@ exports.verifyOtp = async (req, res) => {
     const pool = await connectDB();
 
     const result = await pool
-      .request()
-      .input("uid", sql.BigInt, userId)
-      .input("otp", sql.VarChar(20), otp)
-      .input("otp_type", sql.VarChar(20), "R")
-      .input("identifier", sql.VarChar(20), "M")
-      .execute("USP_VerifyOTP");
+  .request()
+  .input("uid", sql.BigInt, userId)
+  .input("otp", sql.VarChar(20), otp)
+  .input("otp_type", sql.VarChar(20), "R")
+  .input("identifier", sql.VarChar(20), "M")
+  .input("ipadd", sql.VarChar(500), "")
+  .input("deviceid", sql.VarChar(5000), "")
+  .input("devicename", sql.VarChar(5000), "")
+  .input("user_agent", sql.VarChar(5000), "")
+  .input("Location", sql.VarChar(5000), "")
+  .execute("USP_VerifyOTP");
 
     if (!result.recordset || result.recordset.length === 0) {
       return res.status(500).json({
@@ -585,12 +576,11 @@ exports.changePin = async (req, res) => {
     res.json({ message: "PIN changed successfully" });
 
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: "Error changing PIN" });
   }
 };
 
-// ================= Send Login OTP =================
+// ================= Resend Login OTP =================
 // exports.sendLoginOtp = async (req, res) => {
 //   try {
 // console.log("Headers:", req.headers);
@@ -669,13 +659,6 @@ exports.resendLoginOtp = async (req, res) => {
       .input("action", sql.VarChar(20), "RESEND_OTP")
       .execute("USP_User_Login");
 
-    console.log("========== RESEND LOGIN OTP ==========");
-    console.log("Recordset:", result.recordset);
-    console.log("Recordsets:", result.recordsets);
-    console.log("RowsAffected:", result.rowsAffected);
-    console.log("Output:", result.output);
-    console.log("ReturnValue:", result.returnValue);
-
     if (!result.recordset || result.recordset.length === 0) {
       return res.status(500).json({
         status: "500",
@@ -685,8 +668,6 @@ exports.resendLoginOtp = async (req, res) => {
 
     const jsonColumn = Object.keys(result.recordset[0])[0];
     const response = JSON.parse(result.recordset[0][jsonColumn]);
-
-    console.log("Parsed Response:", response);
 
     return res
       .status(response.Status === "1" ? 200 : Number(response.Status))
@@ -701,8 +682,6 @@ exports.resendLoginOtp = async (req, res) => {
       });
 
   } catch (err) {
-
-    console.error("RESEND LOGIN OTP ERROR:", err);
 
     return res.status(500).json({
       status: "500",
