@@ -9,13 +9,16 @@ on:
 permissions:
   contents: read
 
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+  KUBE_NAMESPACE: ${{ secrets.KUBE_NAMESPACE }}
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: src
 
     steps:
       - name: Checkout Repository
@@ -25,20 +28,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: src/package-lock.json
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Verify AWS Identity
+      - name: Verify AWS Credentials
         run: aws sts get-caller-identity
 
       - name: Login to Amazon ECR
@@ -47,38 +48,43 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t payo-backend:${{ github.sha }} .
-          docker tag payo-backend:${{ github.sha }} \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          docker build -t $ECR_REPOSITORY:${{ github.sha }} .
 
-      - name: Push Docker Image
+          docker tag $ECR_REPOSITORY:${{ github.sha }} \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+
+          docker tag $ECR_REPOSITORY:${{ github.sha }} \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+
+      - name: Push Docker Images
         run: |
-          docker push \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
-      - name: Configure kubectl
-        working-directory: .
+      - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig \
-            --region ap-south-1 \
-            --name ${{ secrets.EKS_CLUSTER_NAME }}
+            --region $AWS_REGION \
+            --name $EKS_CLUSTER_NAME
 
-      - name: Deploy to EKS
-        working-directory: .
+      - name: Deploy to Amazon EKS
         run: |
           kubectl set image deployment/payo-backend \
-          payo-backend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }} \
-          -n ${{ secrets.KUBE_NAMESPACE }}
+          payo-backend=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest \
+          -n $KUBE_NAMESPACE
+
+      - name: Restart Deployment
+        run: |
+          kubectl rollout restart deployment/payo-backend \
+          -n $KUBE_NAMESPACE
 
       - name: Verify Rollout
-        working-directory: .
         run: |
           kubectl rollout status deployment/payo-backend \
-          -n ${{ secrets.KUBE_NAMESPACE }}
+          -n $KUBE_NAMESPACE
 
-      - name: Show Kubernetes Resources
-        working-directory: .
+      - name: Display Kubernetes Resources
         run: |
-          kubectl get deployments -n ${{ secrets.KUBE_NAMESPACE }}
-          kubectl get pods -n ${{ secrets.KUBE_NAMESPACE }}
-          kubectl get svc -n ${{ secrets.KUBE_NAMESPACE }}
+          kubectl get deployments -n $KUBE_NAMESPACE
+          kubectl get pods -o wide -n $KUBE_NAMESPACE
+          kubectl get svc -n $KUBE_NAMESPACE
