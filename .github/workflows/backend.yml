@@ -20,6 +20,10 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: src
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -29,6 +33,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: src/package-lock.json
 
       - name: Install Dependencies
         run: npm ci
@@ -61,24 +66,28 @@ jobs:
           docker push \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
 
-      - name: Update kubeconfig
+      - name: Configure kubectl
+        working-directory: .
         run: |
           aws eks update-kubeconfig \
             --region $AWS_REGION \
             --name $EKS_CLUSTER_NAME
 
       - name: Deploy to Amazon EKS
+        working-directory: .
         run: |
           kubectl set image deployment/payo-backend \
           payo-backend=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }} \
           -n $KUBE_NAMESPACE
 
       - name: Verify Rollout
+        working-directory: .
         run: |
           kubectl rollout status deployment/payo-backend \
           -n $KUBE_NAMESPACE
 
-      - name: Display Kubernetes Resources
+      - name: Show Kubernetes Resources
+        working-directory: .
         run: |
           kubectl get deployments -n $KUBE_NAMESPACE
           kubectl get pods -n $KUBE_NAMESPACE
