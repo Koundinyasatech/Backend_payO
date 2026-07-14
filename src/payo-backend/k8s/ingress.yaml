@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+
+kind: Ingress
+
+metadata:
+  name: payo-backend-ingress
+  namespace: payo-prod
+
+spec:
+
+  ingressClassName: nginx
+
+  rules:
+
+  - host: api.payo.com
+
+    http:
+
+      paths:
+
+      - path: /
+
+        pathType: Prefix
+
+        backend:
+
+          service:
+
+            name: payo-backend-service
+
+            port:
+
+              number: 80

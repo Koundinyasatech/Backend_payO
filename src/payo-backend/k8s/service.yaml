@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: payo-backend-service
+  namespace: payo-prod
+
+spec:
+
+  selector:
+    app: payo-backend
+
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3001
+
+  type: LoadBalancer

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payo-backend
+  namespace: payo-prod
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: payo-backend
+
+  template:
+    metadata:
+      labels:
+        app: payo-backend
+
+    spec:
+      containers:
+      - name: payo-backend
+
+        image: 011237054417.dkr.ecr.ap-south-1.amazonaws.com/payo-backend:latest
+
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 3001
+
+        env:
+        - name: NODE_ENV
+          value: production
+
+        - name: PORT
+          value: "3001"
+
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
