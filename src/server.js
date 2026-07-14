@@ -31,6 +31,7 @@ const adminKycRoutes = require("./routes/admin/adminKycRoutes");
 const adminAuthRoutes = require("./routes/admin/adminAuthRoutes");
 const adminStatsRoutes = require("./routes/admin/adminStatsRoutes");
 const adminUserDetailRoutes = require("./routes/admin/adminUserDetailRoutes");
+const countryRoutes = require("./routes/countryRoutes");
 
 
 // connect database
@@ -95,6 +96,7 @@ app.use("/api/bank", bankRoutes);
 app.use("/api/trading", tradingRoutes);
 app.use("/api/kyc",kycRoutes);
 app.use("/api/admin/kyc",adminKycRoutes);
+app.use("/api", countryRoutes);  // new api for fetch the country flags
 
 // ── Admin routes ──────────────────────────────────────────────────────────────
 app.use("/api/admin/auth", adminAuthRoutes);               // login, create admin, users
@@ -126,6 +128,6 @@ const PORT = process.env.PORT || 3001;
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log("WebSocket server ready for live updates");
-  console.log("Binance WebSocket connecting for real-time prices...");
+  console.log("WebSocket server ready");
+  console.log("Binance WebSocket connecting...");
 });
