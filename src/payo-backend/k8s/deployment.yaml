@@ -1,8 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
   name: payo-backend
   namespace: payo-prod
+
 spec:
   replicas: 2
 
@@ -17,27 +19,60 @@ spec:
 
     spec:
       containers:
-      - name: payo-backend
+        - name: payo-backend
+          image: 011237054417.dkr.ecr.ap-south-1.amazonaws.com/payo-backend:latest
+          imagePullPolicy: Always
 
-        image: 011237054417.dkr.ecr.ap-south-1.amazonaws.com/payo-backend:latest
+          ports:
+            - containerPort: 3001
 
-        imagePullPolicy: Always
+          env:
+            - name: NODE_ENV
+              value: "production"
 
-        ports:
-        - containerPort: 3001
+            - name: PORT
+              value: "3001"
 
-        env:
-        - name: NODE_ENV
-          value: production
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: payo-backend-secret
+                  key: DB_USER
 
-        - name: PORT
-          value: "3001"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payo-backend-secret
+                  key: DB_PASSWORD
 
-        resources:
-          requests:
-            cpu: "250m"
-            memory: "256Mi"
+            - name: DB_SERVER
+              valueFrom:
+                secretKeyRef:
+                  name: payo-backend-secret
+                  key: DB_SERVER
 
-          limits:
-            cpu: "500m"
-            memory: "512Mi"
+            - name: DB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: payo-backend-secret
+                  key: DB_DATABASE
+
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: payo-backend-secret
+                  key: DB_PORT
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: payo-backend-secret
+                  key: JWT_SECRET
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
