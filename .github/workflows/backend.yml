@@ -9,13 +9,6 @@ on:
 permissions:
   contents: read
 
-env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
-  KUBE_NAMESPACE: ${{ secrets.KUBE_NAMESPACE }}
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -43,9 +36,9 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ap-south-1
 
-      - name: Verify AWS Credentials
+      - name: Verify AWS Identity
         run: aws sts get-caller-identity
 
       - name: Login to Amazon ECR
@@ -54,38 +47,38 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t $ECR_REPOSITORY:${{ github.sha }} .
-          docker tag $ECR_REPOSITORY:${{ github.sha }} \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+          docker build -t payo-backend:${{ github.sha }} .
+          docker tag payo-backend:${{ github.sha }} \
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
 
       - name: Push Docker Image
         run: |
           docker push \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
 
       - name: Configure kubectl
         working-directory: .
         run: |
           aws eks update-kubeconfig \
-            --region $AWS_REGION \
-            --name $EKS_CLUSTER_NAME
+            --region ap-south-1 \
+            --name ${{ secrets.EKS_CLUSTER_NAME }}
 
-      - name: Deploy to Amazon EKS
+      - name: Deploy to EKS
         working-directory: .
         run: |
           kubectl set image deployment/payo-backend \
-          payo-backend=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }} \
-          -n $KUBE_NAMESPACE
+          payo-backend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }} \
+          -n ${{ secrets.KUBE_NAMESPACE }}
 
       - name: Verify Rollout
         working-directory: .
         run: |
           kubectl rollout status deployment/payo-backend \
-          -n $KUBE_NAMESPACE
+          -n ${{ secrets.KUBE_NAMESPACE }}
 
       - name: Show Kubernetes Resources
         working-directory: .
         run: |
-          kubectl get deployments -n $KUBE_NAMESPACE
-          kubectl get pods -n $KUBE_NAMESPACE
-          kubectl get svc -n $KUBE_NAMESPACE
+          kubectl get deployments -n ${{ secrets.KUBE_NAMESPACE }}
+          kubectl get pods -n ${{ secrets.KUBE_NAMESPACE }}
+          kubectl get svc -n ${{ secrets.KUBE_NAMESPACE }}
