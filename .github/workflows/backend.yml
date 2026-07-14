@@ -20,18 +20,48 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: src
+
     steps:
+      # Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # Show Repository Structure (Debug)
+      - name: Show Repository Files
+        run: |
+          echo "========== Current Directory =========="
+          pwd
+
+          echo "========== Root =========="
+          ls -la
+
+          echo "========== Repository Structure =========="
+          find .
+
+      # Setup Node
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      # Verify package.json
+      - name: Verify package.json
+        run: |
+          if [ -f package.json ]; then
+            echo "package.json found"
+          else
+            echo "package.json NOT found"
+            exit 1
+          fi
+
+      # Install Dependencies
       - name: Install Dependencies
         run: npm install
 
+      # Configure AWS Credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -39,13 +69,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      # Verify AWS
       - name: Verify AWS Credentials
         run: aws sts get-caller-identity
 
+      # Login to Amazon ECR
       - name: Login to Amazon ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # Build Docker Image
       - name: Build Docker Image
         run: |
           docker build -t $ECR_REPOSITORY:${{ github.sha }} .
@@ -56,33 +88,40 @@ jobs:
           docker tag $ECR_REPOSITORY:${{ github.sha }} \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
+      # Push Docker Images
       - name: Push Docker Images
         run: |
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
+      # Configure kubectl
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig \
             --region $AWS_REGION \
             --name $EKS_CLUSTER_NAME
 
+      # Update Kubernetes Deployment
       - name: Deploy to Amazon EKS
         run: |
           kubectl set image deployment/payo-backend \
           payo-backend=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest \
           -n $KUBE_NAMESPACE
 
+      # Restart Deployment
       - name: Restart Deployment
         run: |
           kubectl rollout restart deployment/payo-backend \
           -n $KUBE_NAMESPACE
 
+      # Wait for Rollout
       - name: Verify Rollout
         run: |
           kubectl rollout status deployment/payo-backend \
           -n $KUBE_NAMESPACE
 
+      # Show Kubernetes Status
       - name: Display Kubernetes Resources
         run: |
           kubectl get deployments -n $KUBE_NAMESPACE
