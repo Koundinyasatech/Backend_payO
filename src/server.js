@@ -26,12 +26,13 @@ const marketRoutes = require("./routes/market/marketRoutes");
 const updateMarketCache = require("./services/marketUpdater");
 const bankRoutes = require("./routes/wallet/bankRoutes");
 const tradingRoutes = require('./routes/trading/tradingRoutes');
-const kycRoutes= require("./routes/kyc/kycRoutes");
+//const kycRoutes= require("./routes/kyc/kycRoutes");
 const adminKycRoutes = require("./routes/admin/adminKycRoutes");
 const adminAuthRoutes = require("./routes/admin/adminAuthRoutes");
 const adminStatsRoutes = require("./routes/admin/adminStatsRoutes");
 const adminUserDetailRoutes = require("./routes/admin/adminUserDetailRoutes");
 const countryRoutes = require("./routes/countryRoutes");
+const kycRoutes1 = require("./routes/kyc/kycRoutes1");
 
 
 // connect database
@@ -94,9 +95,10 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/market", marketRoutes);
 app.use("/api/bank", bankRoutes);
 app.use("/api/trading", tradingRoutes);
-app.use("/api/kyc",kycRoutes);
+//app.use("/api/kyc",kycRoutes);
 app.use("/api/admin/kyc",adminKycRoutes);
 app.use("/api", countryRoutes);  // new api for fetch the country flags
+app.use("/api/kyc", kycRoutes1);
 
 // ── Admin routes ──────────────────────────────────────────────────────────────
 app.use("/api/admin/auth", adminAuthRoutes);               // login, create admin, users
