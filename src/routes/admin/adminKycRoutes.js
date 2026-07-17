@@ -1,4 +1,4 @@
-const express = require("express");
+/*const express = require("express");
 const router = express.Router();
 
 const auth = require("../../middleware/auth");
@@ -52,7 +52,7 @@ router.get(
 );
 
 router.get(
-  "/submission-details/:kycId",
+  "/submission-details/:userId",
   requireRole("super_admin", "kyc_admin"),
   getSubmissionDetails
 );
@@ -96,5 +96,65 @@ router.get(
   requireRole("super_admin"),
   getAllKycIds
 );
+
+module.exports = router;*/
+
+
+const express = require("express");
+const router = express.Router();
+
+// Comment these for testing
+const auth = require("../../middleware/auth");
+const adminAuth = require("../../middleware/adminAuth");
+// const requireRole = require("../../middleware/requireRole");
+
+const {
+  getDashboardStats,
+  getAllSubmissions,
+  listPendingReviews,
+  getSubmissionDetails,
+  approveRejectKyc,
+  rejectVerification,
+  bulkApprove,
+  bulkReject,
+  searchUserKyc,
+  deleteKycRecord,
+  getAuditLog,
+  getAllKycIds,
+} = require("../../controllers/admin/adminKycController");
+
+// Disable auth middleware for testing
+router.use(adminAuth);
+
+// Dashboard
+/*router.get("/dashboard-stats", getDashboardStats);
+router.get("/audit-log", getAuditLog);*/
+
+// Testing routes (without requireRole)
+router.get("/all-submissions", getAllSubmissions);
+
+//router.get("/pending-reviews", listPendingReviews);
+
+//router.get("/search-user", searchUserKyc);
+
+router.get("/submission-details/:userId", getSubmissionDetails);
+
+router.patch(
+  "/approve-reject/:docId",
+  adminAuth,
+  approveRejectKyc
+);
+
+//router.patch("/approve-verification/:kycId", approveVerification);
+
+/*router.patch("/reject-verification/:kycId", rejectVerification);
+
+router.patch("/bulk-approve", bulkApprove);
+
+router.patch("/bulk-reject", bulkReject);
+
+router.delete("/delete-record/:kycId", deleteKycRecord);
+
+router.get("/debug-list-ids", getAllKycIds);*/
 
 module.exports = router;
