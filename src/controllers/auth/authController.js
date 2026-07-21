@@ -214,6 +214,7 @@ exports.verifyLoginOtp = async (req, res) => {
 
     const {
       mobile,
+      country_code,
       otp,
       ipAddress,
       deviceId,
@@ -223,7 +224,7 @@ exports.verifyLoginOtp = async (req, res) => {
     } = req.body;
 
     // Validation
-    if (!mobile || !otp) {
+    if (!mobile || !country_code || !otp) {
       return res.status(400).json({
         status: "400",
         message: "Mobile number and OTP are required."
@@ -242,6 +243,7 @@ exports.verifyLoginOtp = async (req, res) => {
     const result = await pool
       .request()
       .input("mobile", sql.VarChar(20), mobile)
+      .input("country_code", sql.VarChar(20), country_code)
       .input("otp", sql.VarChar(20), otp)
       .input("otp_type", sql.VarChar(20), "L")
       .input("identifier", sql.VarChar(20), "M")
