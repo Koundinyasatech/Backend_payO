@@ -1,10 +1,10 @@
-const express = require("express");
+/*const express = require("express");
 const router = express.Router();
 const walletController = require("../../controllers/wallet/walletController");
-const auth = require("../../middleware/auth");
- 
- 
-router.post("/transfer", auth, walletController.transfer);
+const sessionAuth = require("../../middleware/sessionAuth");
+router.post("/add-money", sessionAuth, walletController.addMoneyToWallet);
+router.get("/wallet-details", sessionAuth, walletController.getWalletDetails);*/
+/*router.post("/transfer", auth, walletController.transfer);
 router.get("/balance",auth,walletController.getBalance);
 router.get("/getwallet", auth, walletController.getWallet);
 router.get("/generate-address",auth,walletController.generateAddress);
@@ -22,8 +22,16 @@ router.get("/getwalletdashboard",auth,walletController.walletDashboard);
 router.get("/get-transaction-count", auth, walletController.transactionCount);
 router.get("/income-outcome", auth, walletController.getIncomeOutcome);
 router.get("/profile",auth,walletController.profile);
-router.get("/transactions/user/:walletAddress", auth, walletController.getTransactionsWithUser);
+router.get("/transactions/user/:walletAddress", auth, walletController.getTransactionsWithUser);*/
+const express = require("express");
+const router = express.Router();
 
+const walletController = require("../../controllers/wallet/walletController");
+const sessionAuth = require("../../middleware/sessionAuth");
+router.post("/add-money", sessionAuth, walletController.addMoneyToWallet);
+router.get("/wallet-details", sessionAuth, walletController.getWalletDetails);
 
 module.exports = router;
+
+
  
