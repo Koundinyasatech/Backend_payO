@@ -1004,3 +1004,36 @@ exports.getWalletDetails = async (req, res) => {
     });
   }
 };
+
+//--------------------- GET USER DEPOSIT HISTORY ----------------
+
+exports.getUserDepositHistory = async (req, res) => {
+  try {
+    const pool = await connectDB();
+
+    const result = await pool
+      .request()
+      .input("session_token", sql.VarChar(500), req.sessionToken)
+      .execute("USP_Get_User_Deposit_History");
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(500).json({
+        status: 500,
+        message: "No response received from database."
+      });
+    }
+
+    const response = JSON.parse(result.recordset[0].Result);
+
+    return res.status(response.Status || 200).json(response);
+
+  } catch (error) {
+    console.error("Get User Deposit History Error:", error);
+
+    return res.status(500).json({
+      status: 500,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
