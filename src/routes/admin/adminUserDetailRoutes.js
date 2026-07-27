@@ -1,47 +1,77 @@
-const express    = require("express");
-const router     = express.Router();
+// const express    = require("express");
+// const router     = express.Router();
 
-const auth        = require("../../middleware/auth");
-const adminAuth   = require("../../middleware/adminAuth");
-const requireRole = require("../../middleware/requireRole");
+// const auth        = require("../../middleware/auth");
+// const adminAuth   = require("../../middleware/adminAuth");
+// const requireRole = require("../../middleware/requireRole");
 
-const {
-  getUserKycDocs,
-  getUserTransactions,
-  getUserReferralDetails,
-} = require("../../controllers/admin/adminUserDetailController");
+// const {
+//   getUserKycDocs,
+//   getUserTransactions,
+//   getUserReferralDetails,
+// } = require("../../controllers/admin/adminUserDetailController");
 
-// ── ALL ROUTES BELOW REQUIRE: valid JWT (auth) + admin role (adminAuth) ──────
-router.use(auth, adminAuth);
+// // ── ALL ROUTES BELOW REQUIRE: valid JWT (auth) + admin role (adminAuth) ──────
+// router.use(auth, adminAuth);
 
-// ────────────────────────────────────────────────────────────────────────────
-// KYC DOCUMENTS TAB
-// GET /api/admin/user-details/:userId/kyc
-// ────────────────────────────────────────────────────────────────────────────
+// // ────────────────────────────────────────────────────────────────────────────
+// // KYC DOCUMENTS TAB
+// // GET /api/admin/user-details/:userId/kyc
+// // ────────────────────────────────────────────────────────────────────────────
+// router.get(
+//   "/:userId/kyc",
+//   requireRole("super_admin", "kyc_admin", "support_admin"),
+//   getUserKycDocs
+// );
+
+// // ────────────────────────────────────────────────────────────────────────────
+// // TRANSACTIONS TAB
+// // GET /api/admin/user-details/:userId/transactions?page=1&limit=20&status=
+// // ────────────────────────────────────────────────────────────────────────────
+// router.get(
+//   "/:userId/transactions",
+//   requireRole("super_admin", "operations_admin", "support_admin"),
+//   getUserTransactions
+// );
+
+// // ────────────────────────────────────────────────────────────────────────────
+// // REFERRAL TAB
+// // GET /api/admin/user-details/:userId/referral
+// // ────────────────────────────────────────────────────────────────────────────
+// router.get(
+//   "/:userId/referral",
+//   requireRole("super_admin", "operations_admin", "support_admin"),
+//   getUserReferralDetails
+// );
+
+// module.exports = router;
+
+
+//----------------adminUserDetailRoutes.js--------------------
+const express = require("express");
+const router = express.Router();
+ 
+const adminUserDetailController = require("../../controllers/admin/adminUserDetailController");
+const sessionAuth = require("../../middleware/sessionAuth");
+ 
 router.get(
-  "/:userId/kyc",
-  requireRole("super_admin", "kyc_admin", "support_admin"),
-  getUserKycDocs
+  "/pending-payo-deposits",
+  sessionAuth,
+  adminUserDetailController.getPendingPayoDeposits
 );
 
-// ────────────────────────────────────────────────────────────────────────────
-// TRANSACTIONS TAB
-// GET /api/admin/user-details/:userId/transactions?page=1&limit=20&status=
-// ────────────────────────────────────────────────────────────────────────────
 router.get(
-  "/:userId/transactions",
-  requireRole("super_admin", "operations_admin", "support_admin"),
-  getUserTransactions
+  "/pending-payo-deposits/:userid",
+  sessionAuth,
+  adminUserDetailController.getPendingPayoDeposits
 );
-
-// ────────────────────────────────────────────────────────────────────────────
-// REFERRAL TAB
-// GET /api/admin/user-details/:userId/referral
-// ────────────────────────────────────────────────────────────────────────────
-router.get(
-  "/:userId/referral",
-  requireRole("super_admin", "operations_admin", "support_admin"),
-  getUserReferralDetails
+ 
+router.post(
+  "/deposit-approval-reject",
+  sessionAuth,
+  adminUserDetailController.depositApprovalReject
 );
 
 module.exports = router;
+ 
+ 
