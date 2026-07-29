@@ -30,11 +30,10 @@ const tradingRoutes = require('./routes/trading/tradingRoutes');
 const adminKycRoutes = require("./routes/admin/adminKycRoutes");
 const adminAuthRoutes = require("./routes/admin/adminAuthRoutes");
 const adminStatsRoutes = require("./routes/admin/adminStatsRoutes");
-//const adminUserDetailRoutes = require("./routes/admin/adminUserDetailRoutes");
+const adminUserDetailRoutes = require("./routes/admin/adminUserDetailRoutes");
 const countryRoutes = require("./routes/countryRoutes");
 const kycRoutes1 = require("./routes/kyc/kycRoutes1");
-const adminUserDetailRoutes = require("./routes/admin/adminUserDetailRoutes");
-
+const adminRoutes = require("./routes/admin/adminUserDetailRoutes");
 // connect database
 connectDB();
 
@@ -103,9 +102,8 @@ app.use("/api/kyc", kycRoutes1);
 // ── Admin routes ──────────────────────────────────────────────────────────────
 app.use("/api/admin/auth", adminAuthRoutes);               // login, create admin, users
 app.use("/api/admin/stats", adminStatsRoutes);             // dashboard widget stats
-//app.use("/api/admin/user-details", adminUserDetailRoutes); // kyc docs, transactions, referral
-app.use("/api/admin", adminUserDetailRoutes);
-
+app.use("/api/admin/user-details", adminUserDetailRoutes); // kyc docs, transactions, referral
+app.use("/api/admin", adminRoutes);
 // Root Route
 app.get("/", (req, res) => {
   res.send("Server is running");
@@ -126,7 +124,7 @@ const wss = new WebSocket.Server({ server });
 websocketManager.initialize(wss);
 
 // Start Server
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3003;
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

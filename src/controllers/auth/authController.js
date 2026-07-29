@@ -769,3 +769,34 @@ exports.resetSendOtp = async (req, res) => {
   console.log("OTP:", otp);
   res.json({ message: "OTP sent", otp });
 };
+//------profile---------
+exports.getUserProfile = async (req, res) => {
+  try {
+    const pool = await connectDB();
+
+    const result = await pool
+      .request()
+      .input("session_token", sql.VarChar(500), req.sessionToken)
+      .execute("USP_Get_User_Profile");
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(500).json({
+        Status: 500,
+        Message: "No response received from database."
+      });
+    }
+
+    const response = JSON.parse(result.recordset[0].Result);
+
+    return res.status(response.Status).json(response);
+
+  } catch (err) {
+    console.error("Get User Profile Error:", err);
+
+    return res.status(500).json({
+      Status: 500,
+      Message: err.message
+    });
+  }
+};
+ 
