@@ -4,12 +4,6 @@ const { v4: uuidv4 } = require("uuid");
 const sql = require("mssql");
 const connectDB = require("../../config/db");
 
-const User        = require("../../models/User");
-const Otp         = require("../../models/Otp");
-const Wallet      = require("../../models/Wallet");
-const Transaction = require("../../models/Transaction");
-const Kyc         = require("../../models/Kyc");           // ← NEW
-const { sendNotification } = require("../../utils/notify");
 const { generateWalletAddress, generateQR } = require("../../utils/helpers");
 
 // ======================register========================
@@ -581,62 +575,6 @@ exports.changePin = async (req, res) => {
     res.status(500).json({ message: "Error changing PIN" });
   }
 };
-
-// ================= Resend Login OTP =================
-// exports.sendLoginOtp = async (req, res) => {
-//   try {
-// console.log("Headers:", req.headers);
-//     console.log("Body:", req.body);
-
-//     const { mobile, mobile_cont_code } = req.body;
-
-//     // Validation
-//     if (!mobile || !mobile_cont_code) {
-//       return res.status(400).json({
-//         status: "400",
-//         message: "Mobile number and country code are required."
-//       });
-//     }
-
-//     const pool = await connectDB();
-
-//     const result = await pool
-//       .request()
-//       .input("mobile", sql.VarChar(20), mobile)
-//       .input("mobile_cont_code", sql.VarChar(10), mobile_cont_code)
-//       .execute("USP_User_Login");
-
-//     console.log("Send Login OTP SQL Result:", result.recordset);
-
-//     if (!result.recordset || result.recordset.length === 0) {
-//       return res.status(500).json({
-//         status: "500",
-//         message: "No response received from SQL Server."
-//       });
-//     }
-
-//     const jsonColumn = Object.keys(result.recordset[0])[0];
-//     const response = JSON.parse(result.recordset[0][jsonColumn]);
-
-//     console.log("Send Login OTP Response:", response);
-
-//     if (response.Status !== "1") {
-//       return res.status(Number(response.Status)).json(response);
-//     }
-
-//     return res.status(200).json(response);
-
-//   } catch (err) {
-
-//     console.error("Send Login OTP Error:", err);
-
-//     return res.status(500).json({
-//       status: "500",
-//       message: err.message
-//     });
-
-//   }
-// };
 
 // ================= RESEND LOGIN OTP =================
 exports.resendLoginOtp = async (req, res) => {

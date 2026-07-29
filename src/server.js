@@ -95,7 +95,6 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/market", marketRoutes);
 app.use("/api/bank", bankRoutes);
 app.use("/api/trading", tradingRoutes);
-//app.use("/api/kyc",kycRoutes);
 app.use("/api/admin/kyc",adminKycRoutes);
 app.use("/api", countryRoutes);  // new api for fetch the country flags
 app.use("/api/kyc", kycRoutes1);
@@ -103,7 +102,6 @@ app.use("/api/kyc", kycRoutes1);
 // ── Admin routes ──────────────────────────────────────────────────────────────
 app.use("/api/admin/auth", adminAuthRoutes);               // login, create admin, users
 app.use("/api/admin/stats", adminStatsRoutes);             // dashboard widget stats
-//app.use("/api/admin/user-details", adminUserDetailRoutes); // kyc docs, transactions, referral
 app.use("/api/admin", adminUserDetailRoutes);
 
 // Root Route
