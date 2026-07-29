@@ -1,21 +1,3 @@
-// remove the connection to mongodb
-//const mongoose = require("mongoose");
-
-//add the sql server connection 
-//require("dotenv").config();
-
-// remove existing code 
-// const connectDB = async () => {
-//   try {
-//     await mongoose.connect(process.env.MONGODB_URI);
-//     console.log("MongoDB connected");
-//   } catch (err) {
-//     console.log(err);
-//     process.exit(1);
-//   }
-// };
-
-// add new code for the sql 
 const sql = require("mssql");
 require("dotenv").config();
 console.log({
@@ -42,8 +24,10 @@ let pool;
 const connectDB = async () => {
     try {
         pool = await sql.connect(config);
+        console.log("✅ SQL Server Connected");
         return pool;
     } catch (err) {
+        console.error("❌ Database Connection Error:", err);
         process.exit(1);
     }
 };

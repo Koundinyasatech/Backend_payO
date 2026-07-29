@@ -1,12 +1,6 @@
-//adminKycController
-const Kyc = require("../../models/Kyc");
-const User = require("../../models/User");
-
 const sql = require("mssql");
 const connectDB = require("../../config/db");
 
-const path = require("path");
-const fs = require("fs");
 //----get all kyc sublissions for admin-----
 const getAllSubmissions = async (req, res) => {
   try {

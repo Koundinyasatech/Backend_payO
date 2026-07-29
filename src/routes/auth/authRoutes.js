@@ -9,12 +9,6 @@ router.post("/register", authController.register);
 router.post("/login", authController.login);
 router.post("/set-pin",authController.setPin);
 router.get("/user-profile", sessionAuth, authController.getUserProfile);
-// router.post("/send-login-otp",authController.sendLoginOtp);
-//router.post("/change-pin",auth,authController.changePin);
 router.post("/verify-login-otp",authController.verifyLoginOtp);
 router.post("/resend-login-otp",authController.resendLoginOtp);
-//router.post("/reset-password",auth,authController.resetPassword);
-router.post("/reset-send-otp",authController.resetSendOtp);
-router.post("/reset-verify-otp",authController.resetVerifyOtp);
-
 module.exports = router;

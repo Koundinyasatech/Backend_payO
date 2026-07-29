@@ -1,16 +1,5 @@
-const bcrypt = require("bcrypt");
-const jwt    = require("jsonwebtoken");
-const { v4: uuidv4 } = require("uuid");
 const sql = require("mssql");
-const connectDB = require("../../config/db");
-
-const User        = require("../../models/User");
-const Otp         = require("../../models/Otp");
-const Wallet      = require("../../models/Wallet");
-const Transaction = require("../../models/Transaction");
-const Kyc         = require("../../models/Kyc");           // ← NEW
-const { sendNotification } = require("../../utils/notify");
-const { generateWalletAddress, generateQR } = require("../../utils/helpers");
+const connectDB = require("../../config/db");           
 
 // ======================register========================
 exports.register = async (req, res) => {
@@ -86,83 +75,6 @@ exports.register = async (req, res) => {
 };
 
 // ======================login========================
-// ── KEY CHANGE: checks KYC status and tells app where to send user ──────────
-// exports.login = async (req, res) => {
-//   try {
-//     const { email, mobile, password } = req.body;
-
-//     // find user
-//     const user = email
-//       ? await User.findOne({ email })
-//       : await User.findOne({ mobile });
-
-//     if (!user) return res.status(400).json({ message: "User not found" });
-
-//     // check password
-//     const match = await bcrypt.compare(password, user.password);
-//     if (!match) return res.status(400).json({ message: "Wrong password" });
-
-//     // ── KYC STATUS CHECK ──────────────────────────────────────────────────
-//     // Check KYC record to know the exact status
-//     const kyc = await Kyc.findOne({ userId: user._id });
-
-//     const kycStatus = kyc ? kyc.status : "not_started";
-
-//     // Block login ONLY if KYC was rejected (they must retry)
-//     // Allow login for not_started, documents_uploaded, under_review, approved
-//     if (kycStatus === "rejected") {
-//       return res.status(403).json({
-//         message:   "Your KYC verification failed. Please retry.",
-//         kycStatus: "rejected",
-//         action:    "retry_kyc",  // tells app to show retry screen
-//       });
-//     }
-
-//     // generate token
-//     const token = jwt.sign(
-//       { id: user._id, mobile: user.mobile },
-//       "mysecretkey",
-//       { expiresIn: "24h" } 
-//     );
-
-//     await sendNotification({
-//       userId:  user._id,
-//       title:   "Login Alert",
-//       message: "You logged into your account",
-//       type:    "SECURITY",
-//     });
-
-//     // ── Tell the app exactly where to navigate ────────────────────────────
-//     let redirectTo = "home"; // default — KYC approved, full access
-
-//     if (kycStatus === "not_started") {
-//       redirectTo = "kyc_upload";      // → go to Screen 1 (upload docs)
-//     } else if (kycStatus === "documents_uploaded" || kycStatus === "under_review") {
-//       redirectTo = "kyc_under_review"; // → go to Screen 4 (waiting)
-//     } else if (kycStatus === "approved") {
-//       redirectTo = "home";             // → full app access
-//     }
-
-//     res.json({
-//       message:   "Login success",
-//       token,
-//       kycStatus,
-//       redirectTo,  // ← front-end uses this to navigate to correct screen
-//       user: {
-//         id:              user._id,
-//         name:            user.name,
-//         email:           user.email,
-//         mobile:          user.mobile,
-//         kycVerified:     user.kycVerified,
-//         walletActivated: user.walletActivated,
-//       },
-//     });
-
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
 exports.login = async (req, res) => {
   try {
     const { mobile, mobile_cont_code } = req.body;
@@ -554,90 +466,6 @@ exports.setPin = async (req, res) => {
   }
 };
 
-// ================= change transaction pin =================
-exports.changePin = async (req, res) => {
-  try {
-    const { old_pin, new_pin } = req.body;
-
-    if (!old_pin || !new_pin) return res.status(400).json({ message: "Old PIN and New PIN are required" });
-    if (!/^\d{4}$/.test(new_pin)) return res.status(400).json({ message: "New PIN must be 4 digits" });
-    if (!req.userId) return res.status(401).json({ message: "Invalid token" });
-
-    const user = await User.findById(req.userId);
-    if (!user || !user.transactionPin) return res.status(404).json({ message: "User or PIN not found" });
-
-    const isMatch = await bcrypt.compare(old_pin, user.transactionPin);
-    if (!isMatch) return res.status(400).json({ message: "Old PIN is incorrect" });
-
-    const isSame = await bcrypt.compare(new_pin, user.transactionPin);
-    if (isSame) return res.status(400).json({ message: "New PIN cannot be same as old PIN" });
-
-    user.transactionPin = await bcrypt.hash(new_pin, 10);
-    await user.save();
-
-    res.json({ message: "PIN changed successfully" });
-
-  } catch (err) {
-    res.status(500).json({ message: "Error changing PIN" });
-  }
-};
-
-// ================= Resend Login OTP =================
-// exports.sendLoginOtp = async (req, res) => {
-//   try {
-// console.log("Headers:", req.headers);
-//     console.log("Body:", req.body);
-
-//     const { mobile, mobile_cont_code } = req.body;
-
-//     // Validation
-//     if (!mobile || !mobile_cont_code) {
-//       return res.status(400).json({
-//         status: "400",
-//         message: "Mobile number and country code are required."
-//       });
-//     }
-
-//     const pool = await connectDB();
-
-//     const result = await pool
-//       .request()
-//       .input("mobile", sql.VarChar(20), mobile)
-//       .input("mobile_cont_code", sql.VarChar(10), mobile_cont_code)
-//       .execute("USP_User_Login");
-
-//     console.log("Send Login OTP SQL Result:", result.recordset);
-
-//     if (!result.recordset || result.recordset.length === 0) {
-//       return res.status(500).json({
-//         status: "500",
-//         message: "No response received from SQL Server."
-//       });
-//     }
-
-//     const jsonColumn = Object.keys(result.recordset[0])[0];
-//     const response = JSON.parse(result.recordset[0][jsonColumn]);
-
-//     console.log("Send Login OTP Response:", response);
-
-//     if (response.Status !== "1") {
-//       return res.status(Number(response.Status)).json(response);
-//     }
-
-//     return res.status(200).json(response);
-
-//   } catch (err) {
-
-//     console.error("Send Login OTP Error:", err);
-
-//     return res.status(500).json({
-//       status: "500",
-//       message: err.message
-//     });
-
-//   }
-// };
-
 // ================= RESEND LOGIN OTP =================
 exports.resendLoginOtp = async (req, res) => {
   try {
@@ -692,83 +520,8 @@ exports.resendLoginOtp = async (req, res) => {
 
   }
 };
-// ================= reset password =================
-exports.resetPassword = async (req, res) => {
-  try {
-    const { password, confirmPassword } = req.body;
 
-    if (!password || !confirmPassword) return res.status(400).json({ message: "All fields required" });
-    if (password !== confirmPassword) return res.status(400).json({ message: "Passwords mismatch" });
 
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
-    if (!passwordRegex.test(password)) {
-      return res.status(400).json({ message: "Use 8+ chars with uppercase, lowercase, number & special character" });
-    }
-
-    const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const isSame = await bcrypt.compare(password, user.password);
-    if (isSame) return res.status(400).json({ message: "New password cannot be same as old password" });
-
-    user.password = await bcrypt.hash(password, 10);
-    await user.save();
-
-    if (req.mobile) await Otp.deleteOne({ mobile: req.mobile });
-
-    res.json({ message: "Password changed successfully" });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// ================= reset verify otp =================
-exports.resetVerifyOtp = async (req, res) => {
-  try {
-    const { mobile, otp } = req.body;
-    const record = await Otp.findOne({ mobile });
-
-    if (!record || !record.otp) return res.status(400).json({ message: "OTP not found" });
-    if (record.expiresAt < Date.now()) return res.status(400).json({ message: "Expired OTP" });
-
-    const isMatch = await bcrypt.compare(String(otp).trim(), record.otp);
-    if (!isMatch) return res.status(400).json({ message: "Invalid OTP" });
-
-    record.isVerified = true;
-    await record.save();
-
-    const token = jwt.sign({ mobile }, "mysecretkey", { expiresIn: "24h" });
-    return res.json({ message: "OTP verified", token });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// ================= reset send otp =================
-exports.resetSendOtp = async (req, res) => {
-  const { mobile } = req.body;
-
-  if (!/^[0-9]{10}$/.test(mobile)) return res.status(400).json({ message: "Invalid mobile" });
-
-  const existingUser = await User.findOne({ mobile });
-  if (!existingUser) return res.status(400).json({ message: "Mobile number not registered" });
-
-  const otp       = Math.floor(1000 + Math.random() * 9000).toString();
-  const hashedOtp = await bcrypt.hash(otp, 10);
-
-  await Otp.findOneAndUpdate(
-    { mobile },
-    { $set: { otp: hashedOtp, isVerified: false, expiresAt: Date.now() + 2 * 60 * 1000 } },
-    { upsert: true, returnDocument: "after" }
-  );
-
-  console.log("OTP:", otp);
-  res.json({ message: "OTP sent", otp });
-};
 //------profile---------
 exports.getUserProfile = async (req, res) => {
   try {
