@@ -26,14 +26,13 @@ const marketRoutes = require("./routes/market/marketRoutes");
 const updateMarketCache = require("./services/marketUpdater");
 const bankRoutes = require("./routes/wallet/bankRoutes");
 const tradingRoutes = require('./routes/trading/tradingRoutes');
-//const kycRoutes= require("./routes/kyc/kycRoutes");
 const adminKycRoutes = require("./routes/admin/adminKycRoutes");
 const adminAuthRoutes = require("./routes/admin/adminAuthRoutes");
 const adminStatsRoutes = require("./routes/admin/adminStatsRoutes");
-//const adminUserDetailRoutes = require("./routes/admin/adminUserDetailRoutes");
 const countryRoutes = require("./routes/countryRoutes");
 const kycRoutes1 = require("./routes/kyc/kycRoutes1");
 const adminUserDetailRoutes = require("./routes/admin/adminUserDetailRoutes");
+const newsRoutes= require("./routes/news/newsRoutes");
 
 // connect database
 connectDB();
@@ -103,6 +102,9 @@ app.use("/api/kyc", kycRoutes1);
 app.use("/api/admin/auth", adminAuthRoutes);               // login, create admin, users
 app.use("/api/admin/stats", adminStatsRoutes);             // dashboard widget stats
 app.use("/api/admin", adminUserDetailRoutes);
+
+// ── news api ──────────────────────────────────────────────────────────────
+app.use("/api/news",newsRoutes);
 
 // Root Route
 app.get("/", (req, res) => {
