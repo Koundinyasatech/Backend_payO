@@ -33,6 +33,7 @@ const countryRoutes = require("./routes/countryRoutes");
 const kycRoutes1 = require("./routes/kyc/kycRoutes1");
 const adminUserDetailRoutes = require("./routes/admin/adminUserDetailRoutes");
 const newsRoutes= require("./routes/news/newsRoutes");
+const adminBonusSchemeRoutes = require("./routes/admin/adminBonusSchemeRoutes");
 
 // connect database
 connectDB();
@@ -105,6 +106,7 @@ app.use("/api/admin", adminUserDetailRoutes);
 
 // ── news api ──────────────────────────────────────────────────────────────
 app.use("/api/news",newsRoutes);
+app.use("/api/admin", adminBonusSchemeRoutes);
 
 // Root Route
 app.get("/", (req, res) => {
