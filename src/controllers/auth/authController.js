@@ -1,6 +1,3 @@
-const bcrypt = require("bcrypt");
-const jwt    = require("jsonwebtoken");
-const { v4: uuidv4 } = require("uuid");
 const sql = require("mssql");
 const connectDB = require("../../config/db");
 
@@ -653,6 +650,45 @@ exports.getUserProfile = async (req, res) => {
 
   } catch (err) {
     console.error("Get User Profile Error:", err);
+
+    return res.status(500).json({
+      Status: 500,
+      Message: err.message
+    });
+  }
+};
+
+
+// ================= user dashboard =================
+exports.userDashboard = async (req, res) => {
+  try {
+    const pool = await connectDB();
+
+    const result = await pool
+      .request()
+      .input("session_token", sql.VarChar(sql.MAX), req.sessionToken)
+      .execute("USP_User_Dashboard");
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(500).json({
+        Status: 500,
+        Message: "No response received from database."
+      });
+    }
+
+    const firstRow = result.recordset[0];
+    const jsonColumn = Object.keys(firstRow)[0];
+    const rawJson = firstRow[jsonColumn];
+
+    const response =
+      typeof rawJson === "string"
+        ? JSON.parse(rawJson)
+        : rawJson;
+
+    return res.status(Number(response.Status) || 200).json(response);
+
+  } catch (err) {
+    console.error("User Dashboard Error:", err);
 
     return res.status(500).json({
       Status: 500,
