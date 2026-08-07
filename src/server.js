@@ -34,6 +34,7 @@ const kycRoutes1 = require("./routes/kyc/kycRoutes1");
 const adminUserDetailRoutes = require("./routes/admin/adminUserDetailRoutes");
 const newsRoutes= require("./routes/news/newsRoutes");
 const adminBonusSchemeRoutes = require("./routes/admin/adminBonusSchemeRoutes");
+const adminReferralRoutes = require("./routes/admin/adminReferralRoutes");
 
 // connect database
 connectDB();
@@ -103,6 +104,7 @@ app.use("/api/kyc", kycRoutes1);
 app.use("/api/admin/auth", adminAuthRoutes);               // login, create admin, users
 app.use("/api/admin/stats", adminStatsRoutes);             // dashboard widget stats
 app.use("/api/admin", adminUserDetailRoutes);
+app.use("/api/admin", adminReferralRoutes);
 
 // ── news api ──────────────────────────────────────────────────────────────
 app.use("/api/news",newsRoutes);
