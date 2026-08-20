@@ -1,5 +1,6 @@
 const sql = require("mssql");
 const connectDB = require("../../config/db");
+const { sendOtpViaMsg91 } = require("../../services/msg91Service");
 
 const { generateWalletAddress, generateQR } = require("../../utils/helpers");
 
@@ -108,6 +109,12 @@ exports.login = async (req, res) => {
 
     if (response.Status === "0") {
       return res.status(400).json(response);
+    }
+
+    // Send OTP via MSG91 if returned by stored procedure
+    const otpToSend = response.OTP || response.otp;
+    if (otpToSend) {
+      await sendOtpViaMsg91(mobile, mobile_cont_code, otpToSend);
     }
 
     return res.status(200).json(response);
@@ -224,7 +231,13 @@ exports.resendOtp = async (req, res) => {
     const jsonColumn = Object.keys(result.recordset[0])[0];
     const response = JSON.parse(result.recordset[0][jsonColumn]);
 
-    return res.status(Number(response.Status)).json({
+    // Send OTP via MSG91
+    const otpToSend = response.OTP || response.otp;
+    if (otpToSend && response.Status !== "0") {
+      await sendOtpViaMsg91(mobile, countryCode, otpToSend);
+    }
+
+    return res.status(Number(response.Status) || 200).json({
       status: response.Status,
       message: response.Message,
       userId: response.UserId,
@@ -338,6 +351,12 @@ exports.sendOtp = async (req, res) => {
         otp: response.OTP,
         errorNumber: response.ErrorNumber
       });
+    }
+
+    // Send OTP via MSG91
+    const otpToSend = response.OTP || response.otp;
+    if (otpToSend) {
+      await sendOtpViaMsg91(mobile, countryCode, otpToSend);
     }
 
     return res.status(200).json({
@@ -529,8 +548,14 @@ exports.resendLoginOtp = async (req, res) => {
     const jsonColumn = Object.keys(result.recordset[0])[0];
     const response = JSON.parse(result.recordset[0][jsonColumn]);
 
+    // Send OTP via MSG91
+    const otpToSend = response.OTP || response.otp;
+    if (otpToSend && (response.Status === "1" || response.Status === 1 || response.Status === "200")) {
+      await sendOtpViaMsg91(mobile, mobile_cont_code, otpToSend);
+    }
+
     return res
-      .status(response.Status === "1" ? 200 : Number(response.Status))
+      .status(response.Status === "1" ? 200 : Number(response.Status) || 200)
       .json({
         status: response.Status,
         message: response.Message,
@@ -625,6 +650,7 @@ exports.resetSendOtp = async (req, res) => {
   );
 
   console.log("OTP:", otp);
+  await sendOtpViaMsg91(mobile, "91", otp);
   res.json({ message: "OTP sent", otp });
 };
 
