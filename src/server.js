@@ -35,6 +35,7 @@ const adminUserDetailRoutes = require("./routes/admin/adminUserDetailRoutes");
 const newsRoutes= require("./routes/news/newsRoutes");
 const adminBonusSchemeRoutes = require("./routes/admin/adminBonusSchemeRoutes");
 const adminReferralRoutes = require("./routes/admin/adminReferralRoutes");
+const rewardRoutes = require("./routes/reward/rewardRoutes");
 
 // connect database
 connectDB();
@@ -105,6 +106,7 @@ app.use("/api/admin/auth", adminAuthRoutes);               // login, create admi
 app.use("/api/admin/stats", adminStatsRoutes);             // dashboard widget stats
 app.use("/api/admin", adminUserDetailRoutes);
 app.use("/api/admin", adminReferralRoutes);
+app.use("/api/reward", rewardRoutes);
 
 // ── news api ──────────────────────────────────────────────────────────────
 app.use("/api/news",newsRoutes);
