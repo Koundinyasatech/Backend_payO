@@ -18,4 +18,10 @@ router.post(
   adminAuth,
   rewardController.addRewardMilestone
 );
+// GET REWARD MILESTONE CONFIGURATION
+router.get(
+  "/reward-milestone-config",
+  adminAuth,
+  rewardController.getRewardMilestoneConfig
+);
 module.exports = router;
