@@ -438,3 +438,69 @@ return res
   });
 }
 };
+// GET REWARD MILESTONE CONFIGURATION
+// GET /api/reward/reward-milestone-config
+exports.getRewardMilestoneConfig = async (req, res) => {
+  try {
+    // Get SQL Server connection.
+    const pool = await connectDB();
+
+    // Execute stored procedure with the admin session token
+    // provided by adminAuth middleware.
+    const result = await pool
+      .request()
+      .input(
+        "admin_token",
+        sql.VarChar(sql.MAX),
+        req.adminSession?.trim() || null
+      )
+      .execute("USP_Add_Reward_Milestone_Get");
+
+    // Stored procedure returns the complete JSON response
+    // in the first column of the first record.
+    const rawResponse = result.recordset?.[0];
+
+    if (!rawResponse) {
+      return res.status(500).json({
+        StatusCode: 500,
+        Message:
+          "An unexpected error occurred while retrieving the reward milestone configuration."
+      });
+    }
+
+    // Get the JSON value returned by SQL Server.
+    const response = Object.values(rawResponse)[0];
+
+    if (!response) {
+      return res.status(500).json({
+        StatusCode: 500,
+        Message:
+          "An unexpected error occurred while retrieving the reward milestone configuration."
+      });
+    }
+
+    // SQL Server returns the response as JSON text.
+    const dbResponse =
+      typeof response === "string"
+        ? JSON.parse(response)
+        : response;
+
+    // Return the stored procedure response as-is.
+    return res
+      .status(Number(dbResponse.StatusCode) || 500)
+      .json(dbResponse);
+
+  } catch (err) {
+    console.error(
+      "Get Reward Milestone Config Error:",
+      err
+    );
+
+    // Do not expose internal SQL/server errors.
+    return res.status(500).json({
+      StatusCode: 500,
+      Message:
+        "An unexpected error occurred while retrieving the reward milestone configuration."
+    });
+  }
+};
