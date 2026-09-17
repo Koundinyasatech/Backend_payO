@@ -24,4 +24,10 @@ router.get(
   adminAuth,
   rewardController.getRewardMilestoneConfig
 );
+// GET REWARD DETAILS
+router.get(
+  "/reward-details",
+  adminAuth,
+  rewardController.getRewardDetails
+);
 module.exports = router;

@@ -504,3 +504,54 @@ exports.getRewardMilestoneConfig = async (req, res) => {
     });
   }
 };
+// GET REWARD DETAILS
+// GET /api/reward/reward-details
+exports.getRewardDetails = async (req, res) => {
+  try {
+    const milestoneId = req.query.milestone_id ?? 0;
+    if (!/^\d+$/.test(String(milestoneId))) {
+      return res.status(400).json({
+        StatusCode: 400,
+        Message: "MilestoneId must be a valid integer.",
+        Data: null
+      });
+    }
+    const pool = await connectDB();
+    const result = await pool
+      .request()
+      .input(
+        "admin_token",
+        sql.VarChar(sql.MAX),
+        req.adminSession?.trim() || null
+      )
+      .input(
+        "milestone_id",
+        sql.BigInt,
+        Number(milestoneId)
+      )
+      .execute("USP_Get_Reward_Details");
+    const rawResponse = result.recordset?.[0];
+    if (!rawResponse) {
+      return res.status(500).json({
+        StatusCode: 500,
+        Message: "An unexpected error occurred while retrieving reward details.",
+        Data: null
+      });
+    }
+    const response = Object.values(rawResponse)[0];
+    const dbResponse =
+      typeof response === "string"
+        ? JSON.parse(response)
+        : response;
+    return res
+      .status(Number(dbResponse.StatusCode) || 500)
+      .json(dbResponse);
+  } catch (err) {
+    console.error("Get Reward Details Error:", err);
+    return res.status(500).json({
+      StatusCode: 500,
+      Message: "An unexpected error occurred while retrieving reward details.",
+      Data: null
+    });
+  }
+};
