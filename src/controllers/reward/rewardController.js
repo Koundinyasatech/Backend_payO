@@ -555,3 +555,134 @@ exports.getRewardDetails = async (req, res) => {
     });
   }
 };
+// EDIT REWARD MILESTONE
+// PATCH /api/reward/partner-reward-milestone/:milestoneid
+exports.editRewardMilestone = async (req, res) => {
+  try {
+    const { milestoneid } = req.params;
+    // Validate milestone ID
+    if (!/^\d+$/.test(String(milestoneid)) || Number(milestoneid) <= 0) {
+      return res.status(400).json({
+        status: 400,
+        success: false,
+        message: "Please provide a valid milestone id."
+      });
+    }
+ // Get only the fields supplied by the client for partial update.
+    const {
+      partner_level_name,
+      milestone_achieved_amount,
+      business_slab_min_amount,
+      business_slab_max_amount,
+      slab_rate_percent,
+      completion_bonus_percent,
+      completion_bonus_after_milestone_id,
+      eligibility_conditions,
+      reward_type,
+      reward_value,
+      settlement_days,
+      max_payout_amount
+    } = req.body;
+ // Connect to the database and execute the stored procedure.
+    const pool = await connectDB();
+    const request = pool
+      .request()
+      .input(
+        "admin_token",
+        sql.VarChar(sql.MAX),
+        req.adminSession?.trim() || null
+      )
+      .input(
+        "milestoneid",
+        sql.BigInt,
+        Number(milestoneid)
+      )
+      .input(
+        "partner_level_name",
+        sql.VarChar(250),
+        partner_level_name ?? null
+      )
+      .input(
+        "milestone_achieved_amount",
+        sql.VarChar(250),
+        milestone_achieved_amount ?? null
+      )
+      .input(
+        "business_slab_min_amount",
+        sql.VarChar(250),
+        business_slab_min_amount ?? null
+      )
+      .input(
+        "business_slab_max_amount",
+        sql.VarChar(250),
+        business_slab_max_amount ?? null
+      )
+      .input(
+        "slab_rate_percent",
+        sql.VarChar(50),
+        slab_rate_percent ?? null
+      )
+      .input(
+        "completion_bonus_percent",
+        sql.VarChar(500),
+        completion_bonus_percent ?? null
+      )
+      .input(
+        "completion_bonus_after_milestone_id",
+        sql.BigInt,
+        completion_bonus_after_milestone_id ?? null
+      )
+      .input(
+        "eligibility_conditions",
+        sql.NVarChar(sql.MAX),
+        eligibility_conditions ?? null
+      )
+      .input(
+        "reward_type",
+        sql.VarChar(500),
+        reward_type ?? null
+      )
+      .input(
+        "reward_value",
+        sql.VarChar(100),
+        reward_value ?? null
+      )
+      .input(
+        "settlement_days",
+        sql.Int,
+        settlement_days ?? null
+      )
+      .input(
+        "max_payout_amount",
+        sql.VarChar(100),
+        max_payout_amount ?? null
+      );
+    const result = await request.execute(
+      "USP_Admin_Reward_Milestone_Edit"
+    );
+    const rawResponse = result.recordset?.[0]?.Response;
+    if (!rawResponse) {
+      return res.status(500).json({
+        status: 500,
+        success: false,
+        message:
+          "An unexpected error occurred while updating the milestone."
+      });
+    }
+    const dbResponse =
+      typeof rawResponse === "string"
+        ? JSON.parse(rawResponse)
+        : rawResponse;
+    return res
+      .status(Number(dbResponse.status) || 500)
+      .json(dbResponse);
+  } catch (err) {
+    console.error("Edit Reward Milestone Error:", err);
+    return res.status(500).json({
+      status: 500,
+      success: false,
+      message:
+        "An unexpected error occurred while updating the milestone."
+    });
+  }
+};
