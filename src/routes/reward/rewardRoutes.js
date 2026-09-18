@@ -30,4 +30,10 @@ router.get(
   adminAuth,
   rewardController.getRewardDetails
 );
+// EDIT REWARD MILESTONE
+router.patch(
+  "/partner-reward-milestone/:milestoneid",
+  adminAuth,
+  rewardController.editRewardMilestone
+);
 module.exports = router;
