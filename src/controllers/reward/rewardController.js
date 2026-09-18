@@ -560,7 +560,6 @@ exports.getRewardDetails = async (req, res) => {
 exports.editRewardMilestone = async (req, res) => {
   try {
     const { milestoneid } = req.params;
-
     // Validate milestone ID
     if (!/^\d+$/.test(String(milestoneid)) || Number(milestoneid) <= 0) {
       return res.status(400).json({
@@ -586,7 +585,6 @@ exports.editRewardMilestone = async (req, res) => {
     } = req.body;
  // Connect to the database and execute the stored procedure.
     const pool = await connectDB();
-
     const request = pool
       .request()
       .input(
@@ -659,13 +657,10 @@ exports.editRewardMilestone = async (req, res) => {
         sql.VarChar(100),
         max_payout_amount ?? null
       );
-
     const result = await request.execute(
       "USP_Admin_Reward_Milestone_Edit"
     );
-
     const rawResponse = result.recordset?.[0]?.Response;
-
     if (!rawResponse) {
       return res.status(500).json({
         status: 500,
@@ -674,19 +669,15 @@ exports.editRewardMilestone = async (req, res) => {
           "An unexpected error occurred while updating the milestone."
       });
     }
-
     const dbResponse =
       typeof rawResponse === "string"
         ? JSON.parse(rawResponse)
         : rawResponse;
-
     return res
       .status(Number(dbResponse.status) || 500)
       .json(dbResponse);
-
   } catch (err) {
     console.error("Edit Reward Milestone Error:", err);
-
     return res.status(500).json({
       status: 500,
       success: false,
