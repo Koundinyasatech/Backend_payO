@@ -1,12 +1,16 @@
+```yaml
 name: PayO Backend CI/CD
 
 on:
   push:
     branches:
       - main
+
   workflow_dispatch:
 
+# Required for GitHub OIDC authentication with AWS
 permissions:
+  id-token: write
   contents: read
 
 env:
@@ -18,6 +22,7 @@ env:
 
 jobs:
   build-and-deploy:
+    name: Build and Deploy Backend
     runs-on: ubuntu-latest
 
     defaults:
@@ -25,11 +30,32 @@ jobs:
         working-directory: src
 
     steps:
-      # Checkout Repository
-      - name: Checkout Repository
-        uses: actions/checkout@v4
 
-      # Show Repository Structure (Debug)
+      # ==========================================================
+      # 1. Checkout Repository
+      # ==========================================================
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # ==========================================================
+      # 2. Show Repository Information
+      # ==========================================================
+      - name: Show GitHub Repository Information
+        run: |
+          echo "=========================================="
+          echo "GitHub Repository Information"
+          echo "=========================================="
+          echo "Repository       : $GITHUB_REPOSITORY"
+          echo "Repository ID    : $GITHUB_REPOSITORY_ID"
+          echo "Repository Owner : $GITHUB_REPOSITORY_OWNER"
+          echo "Owner ID         : $GITHUB_REPOSITORY_OWNER_ID"
+          echo "Branch/Ref       : $GITHUB_REF"
+          echo "Commit           : $GITHUB_SHA"
+          echo "=========================================="
+
+      # ==========================================================
+      # 3. Show Repository Structure
+      # ==========================================================
       - name: Show Repository Files
         run: |
           echo "========== Current Directory =========="
@@ -39,91 +65,304 @@ jobs:
           ls -la
 
           echo "========== Repository Structure =========="
-          find .
+          find . -maxdepth 3 -type f | sort
 
-      # Setup Node
+      # ==========================================================
+      # 4. Setup Node.js
+      # ==========================================================
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: "20"
+          cache: npm
 
-      # Verify package.json
+      # ==========================================================
+      # 5. Verify package.json
+      # ==========================================================
       - name: Verify package.json
         run: |
           if [ -f package.json ]; then
-            echo "package.json found"
+            echo "package.json found successfully."
           else
-            echo "package.json NOT found"
+            echo "ERROR: package.json NOT found."
             exit 1
           fi
 
-      # Install Dependencies
+      # ==========================================================
+      # 6. Install Dependencies
+      # ==========================================================
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
-      # Configure AWS Credentials
+      # ==========================================================
+      # 7. Inspect GitHub OIDC Claims
+      # ==========================================================
+      # TEMPORARY DIAGNOSTIC STEP
+      # Remove this step after OIDC configuration is confirmed.
+      - name: Inspect GitHub OIDC Claims
+        shell: bash
+        run: |
+          set -e
+
+          echo "=========================================="
+          echo "Requesting GitHub OIDC Token"
+          echo "=========================================="
+
+          OIDC_RESPONSE=$(curl -sS \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
+
+          OIDC_TOKEN=$(echo "$OIDC_RESPONSE" | jq -r '.value')
+
+          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
+            echo "ERROR: Could not obtain GitHub OIDC token."
+            exit 1
+          fi
+
+          echo "OIDC token received successfully."
+
+          # Extract JWT payload
+          PAYLOAD=$(echo "$OIDC_TOKEN" | cut -d '.' -f 2)
+
+          # Convert Base64URL to Base64
+          PAYLOAD=$(echo "$PAYLOAD" | tr '_-' '/+')
+
+          # Add Base64 padding
+          MOD=$(( ${#PAYLOAD} % 4 ))
+
+          if [ "$MOD" -eq 2 ]; then
+            PAYLOAD="${PAYLOAD}=="
+          elif [ "$MOD" -eq 3 ]; then
+            PAYLOAD="${PAYLOAD}="
+          fi
+
+          # Decode payload
+          CLAIMS=$(echo "$PAYLOAD" | base64 -d 2>/dev/null)
+
+          if [ -z "$CLAIMS" ]; then
+            echo "ERROR: Could not decode OIDC claims."
+            exit 1
+          fi
+
+          echo "=========================================="
+          echo "Actual GitHub OIDC Claims"
+          echo "=========================================="
+
+          echo "$CLAIMS" | jq '{
+            iss,
+            aud,
+            sub,
+            repository,
+            repository_id,
+            repository_owner,
+            repository_owner_id,
+            ref,
+            workflow
+          }'
+
+          echo "=========================================="
+
+      # ==========================================================
+      # 8. Configure AWS using GitHub OIDC
+      # ==========================================================
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-PAYO-Backend
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # Verify AWS
-      - name: Verify AWS Credentials
-        run: aws sts get-caller-identity
+      # ==========================================================
+      # 9. Verify AWS Authentication
+      # ==========================================================
+      - name: Verify AWS Identity
+        run: |
+          echo "=========================================="
+          echo "AWS Identity"
+          echo "=========================================="
 
-      # Login to Amazon ECR
+          aws sts get-caller-identity
+
+          echo "=========================================="
+
+      # ==========================================================
+      # 10. Login to Amazon ECR
+      # ==========================================================
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Build Docker Image
+      # ==========================================================
+      # 11. Verify ECR Repository
+      # ==========================================================
+      - name: Verify ECR Repository
+        run: |
+          echo "Checking ECR repository..."
+
+          aws ecr describe-repositories \
+            --repository-names "$ECR_REPOSITORY" \
+            --region "$AWS_REGION"
+
+      # ==========================================================
+      # 12. Build Docker Image
+      # ==========================================================
       - name: Build Docker Image
         run: |
-          docker build -t $ECR_REPOSITORY:${{ github.sha }} .
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY"
 
-          docker tag $ECR_REPOSITORY:${{ github.sha }} \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+          echo "=========================================="
+          echo "Building Backend Docker Image"
+          echo "=========================================="
+          echo "Image URI: $IMAGE_URI"
 
-          docker tag $ECR_REPOSITORY:${{ github.sha }} \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+          docker build \
+            -t "$IMAGE_URI:${GITHUB_SHA}" \
+            -t "$IMAGE_URI:latest" \
+            .
 
-      # Push Docker Images
-      - name: Push Docker Images
+      # ==========================================================
+      # 13. Push Docker Image to ECR
+      # ==========================================================
+      - name: Push Docker Image to ECR
         run: |
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY"
 
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+          echo "=========================================="
+          echo "Pushing Docker Images to ECR"
+          echo "=========================================="
 
-      # Configure kubectl
+          docker push "$IMAGE_URI:${GITHUB_SHA}"
+          docker push "$IMAGE_URI:latest"
+
+          echo "Images pushed successfully."
+
+      # ==========================================================
+      # 14. Update EKS Kubeconfig
+      # ==========================================================
       - name: Update kubeconfig
         run: |
+          echo "=========================================="
+          echo "Configuring kubectl for EKS"
+          echo "=========================================="
+
           aws eks update-kubeconfig \
-            --region $AWS_REGION \
-            --name $EKS_CLUSTER_NAME
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER_NAME"
 
-      # Update Kubernetes Deployment
-      - name: Deploy to Amazon EKS
+      # ==========================================================
+      # 15. Verify Kubernetes Access
+      # ==========================================================
+      - name: Verify Kubernetes Access
         run: |
+          echo "=========================================="
+          echo "Kubernetes Cluster"
+          echo "=========================================="
+
+          kubectl cluster-info
+
+          echo "=========================================="
+          echo "Kubernetes Nodes"
+          echo "=========================================="
+
+          kubectl get nodes
+
+          echo "=========================================="
+          echo "Namespace"
+          echo "=========================================="
+
+          kubectl get namespace "$KUBE_NAMESPACE"
+
+      # ==========================================================
+      # 16. Verify Backend Deployment
+      # ==========================================================
+      - name: Verify Backend Deployment
+        run: |
+          if kubectl get deployment payo-backend \
+            -n "$KUBE_NAMESPACE" > /dev/null 2>&1; then
+
+            echo "payo-backend deployment found."
+
+          else
+
+            echo "ERROR: payo-backend deployment was not found."
+            exit 1
+
+          fi
+
+      # ==========================================================
+      # 17. Deploy New Backend Image
+      # ==========================================================
+      - name: Deploy Backend to Amazon EKS
+        run: |
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY"
+
+          echo "=========================================="
+          echo "Deploying Backend"
+          echo "=========================================="
+
+          echo "Deployment : payo-backend"
+          echo "Namespace  : $KUBE_NAMESPACE"
+          echo "Image      : $IMAGE_URI:${GITHUB_SHA}"
+
           kubectl set image deployment/payo-backend \
-          payo-backend=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest \
-          -n $KUBE_NAMESPACE
+            payo-backend="$IMAGE_URI:${GITHUB_SHA}" \
+            -n "$KUBE_NAMESPACE"
 
-      # Restart Deployment
-      - name: Restart Deployment
-        run: |
-          kubectl rollout restart deployment/payo-backend \
-          -n $KUBE_NAMESPACE
-
-      # Wait for Rollout
+      # ==========================================================
+      # 18. Wait for Deployment Rollout
+      # ==========================================================
       - name: Verify Rollout
         run: |
-          kubectl rollout status deployment/payo-backend \
-          -n $KUBE_NAMESPACE
+          echo "=========================================="
+          echo "Waiting for Backend Rollout"
+          echo "=========================================="
 
-      # Show Kubernetes Status
+          kubectl rollout status deployment/payo-backend \
+            -n "$KUBE_NAMESPACE" \
+            --timeout=300s
+
+      # ==========================================================
+      # 19. Show Kubernetes Resources
+      # ==========================================================
       - name: Display Kubernetes Resources
         run: |
-          kubectl get deployments -n $KUBE_NAMESPACE
-          kubectl get pods -o wide -n $KUBE_NAMESPACE
-          kubectl get svc -n $KUBE_NAMESPACE
+          echo "=========================================="
+          echo "Deployments"
+          echo "=========================================="
+
+          kubectl get deployments \
+            -n "$KUBE_NAMESPACE"
+
+          echo "=========================================="
+          echo "Pods"
+          echo "=========================================="
+
+          kubectl get pods \
+            -o wide \
+            -n "$KUBE_NAMESPACE"
+
+          echo "=========================================="
+          echo "Services"
+          echo "=========================================="
+
+          kubectl get svc \
+            -n "$KUBE_NAMESPACE"
+
+      # ==========================================================
+      # 20. Deployment Summary
+      # ==========================================================
+      - name: Deployment Summary
+        run: |
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY"
+
+          echo "=========================================="
+          echo "PAYO BACKEND DEPLOYMENT SUCCESSFUL"
+          echo "=========================================="
+          echo "Repository : $GITHUB_REPOSITORY"
+          echo "Commit     : $GITHUB_SHA"
+          echo "AWS Region : $AWS_REGION"
+          echo "ECR Image  : $IMAGE_URI:${GITHUB_SHA}"
+          echo "EKS Cluster: $EKS_CLUSTER_NAME"
+          echo "Namespace  : $KUBE_NAMESPACE"
+          echo "Deployment : payo-backend"
+          echo "=========================================="
+```
