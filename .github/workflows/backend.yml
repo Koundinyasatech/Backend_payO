@@ -20,6 +20,7 @@ env:
   KUBE_NAMESPACE: ${{ secrets.KUBE_NAMESPACE }}
 
 jobs:
+
   build-and-deploy:
     name: Build and Deploy Backend
     runs-on: ubuntu-latest
@@ -108,71 +109,7 @@ jobs:
           npm ci
 
       # ==========================================================
-      # 7. Inspect GitHub OIDC Claims
-      # ==========================================================
-      # TEMPORARY DIAGNOSTIC STEP
-      # Remove this step after OIDC authentication is confirmed.
-      - name: Inspect GitHub OIDC Claims
-        shell: bash
-        run: |
-          set -e
-
-          echo "=========================================="
-          echo "Requesting GitHub OIDC Token"
-          echo "=========================================="
-
-          OIDC_RESPONSE=$(curl -sS \
-            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
-
-          OIDC_TOKEN=$(echo "$OIDC_RESPONSE" | jq -r '.value')
-
-          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
-            echo "ERROR: Could not obtain GitHub OIDC token."
-            exit 1
-          fi
-
-          echo "OIDC token received successfully."
-
-          PAYLOAD=$(echo "$OIDC_TOKEN" | cut -d '.' -f 2)
-
-          PAYLOAD=$(echo "$PAYLOAD" | tr '_-' '/+')
-
-          MOD=$(( ${#PAYLOAD} % 4 ))
-
-          if [ "$MOD" -eq 2 ]; then
-            PAYLOAD="${PAYLOAD}=="
-          elif [ "$MOD" -eq 3 ]; then
-            PAYLOAD="${PAYLOAD}="
-          fi
-
-          CLAIMS=$(echo "$PAYLOAD" | base64 -d 2>/dev/null)
-
-          if [ -z "$CLAIMS" ]; then
-            echo "ERROR: Could not decode OIDC claims."
-            exit 1
-          fi
-
-          echo "=========================================="
-          echo "Actual GitHub OIDC Claims"
-          echo "=========================================="
-
-          echo "$CLAIMS" | jq '{
-            iss,
-            aud,
-            sub,
-            repository,
-            repository_id,
-            repository_owner,
-            repository_owner_id,
-            ref,
-            workflow
-          }'
-
-          echo "=========================================="
-
-      # ==========================================================
-      # 8. Configure AWS Using GitHub OIDC
+      # 7. Configure AWS Using GitHub OIDC
       # ==========================================================
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -182,7 +119,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       # ==========================================================
-      # 9. Verify AWS Authentication
+      # 8. Verify AWS Authentication
       # ==========================================================
       - name: Verify AWS Identity
         run: |
@@ -195,13 +132,13 @@ jobs:
           echo "=========================================="
 
       # ==========================================================
-      # 10. Login to Amazon ECR
+      # 9. Login to Amazon ECR
       # ==========================================================
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
       # ==========================================================
-      # 11. Verify ECR Repository
+      # 10. Verify ECR Repository
       # ==========================================================
       - name: Verify ECR Repository
         run: |
@@ -214,11 +151,12 @@ jobs:
             --region "$AWS_REGION"
 
       # ==========================================================
-      # 12. Build Docker Image
+      # 11. Build Docker Image
       # ==========================================================
       - name: Build Docker Image
         working-directory: src
         run: |
+
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY"
 
           echo "=========================================="
@@ -234,10 +172,11 @@ jobs:
             .
 
       # ==========================================================
-      # 13. Push Docker Image to ECR
+      # 12. Push Docker Image to ECR
       # ==========================================================
       - name: Push Docker Image to ECR
         run: |
+
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY"
 
           echo "=========================================="
@@ -252,10 +191,11 @@ jobs:
           echo "=========================================="
 
       # ==========================================================
-      # 14. Update EKS Kubeconfig
+      # 13. Update EKS Kubeconfig
       # ==========================================================
       - name: Update kubeconfig
         run: |
+
           echo "=========================================="
           echo "Updating EKS Kubeconfig"
           echo "=========================================="
@@ -265,10 +205,11 @@ jobs:
             --name "$EKS_CLUSTER_NAME"
 
       # ==========================================================
-      # 15. Verify Kubernetes Access
+      # 14. Verify Kubernetes Access
       # ==========================================================
       - name: Verify Kubernetes Access
         run: |
+
           echo "=========================================="
           echo "EKS Cluster Information"
           echo "=========================================="
@@ -288,10 +229,11 @@ jobs:
           kubectl get namespace "$KUBE_NAMESPACE"
 
       # ==========================================================
-      # 16. Verify Backend Deployment
+      # 15. Verify Backend Deployment
       # ==========================================================
       - name: Verify Backend Deployment
         run: |
+
           echo "=========================================="
           echo "Checking payo-backend Deployment"
           echo "=========================================="
@@ -309,10 +251,11 @@ jobs:
           fi
 
       # ==========================================================
-      # 17. Deploy Backend Image to EKS
+      # 16. Deploy Backend Image to EKS
       # ==========================================================
       - name: Deploy Backend to Amazon EKS
         run: |
+
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY"
 
           echo "=========================================="
@@ -328,10 +271,11 @@ jobs:
             -n "$KUBE_NAMESPACE"
 
       # ==========================================================
-      # 18. Verify Deployment Rollout
+      # 17. Verify Deployment Rollout
       # ==========================================================
       - name: Verify Rollout
         run: |
+
           echo "=========================================="
           echo "Waiting for Backend Rollout"
           echo "=========================================="
@@ -341,10 +285,11 @@ jobs:
             --timeout=300s
 
       # ==========================================================
-      # 19. Display Kubernetes Resources
+      # 18. Display Kubernetes Resources
       # ==========================================================
       - name: Display Kubernetes Resources
         run: |
+
           echo "=========================================="
           echo "Deployments"
           echo "=========================================="
@@ -368,10 +313,11 @@ jobs:
             -n "$KUBE_NAMESPACE"
 
       # ==========================================================
-      # 20. Deployment Summary
+      # 19. Deployment Summary
       # ==========================================================
       - name: Deployment Summary
         run: |
+
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY"
 
           echo "=========================================="
