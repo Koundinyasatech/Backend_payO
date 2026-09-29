@@ -200,21 +200,54 @@ jobs:
           echo "Updating EKS Kubeconfig"
           echo "=========================================="
 
+          echo "Cluster : $EKS_CLUSTER_NAME"
+          echo "Region  : $AWS_REGION"
+
           aws eks update-kubeconfig \
             --region "$AWS_REGION" \
             --name "$EKS_CLUSTER_NAME"
 
       # ==========================================================
-      # 14. Verify Kubernetes Access
+      # 14. Verify EKS IAM + Kubernetes Access
       # ==========================================================
-      - name: Verify Kubernetes Access
+      - name: Verify EKS Access
         run: |
 
           echo "=========================================="
           echo "EKS Cluster Information"
           echo "=========================================="
 
+          aws eks describe-cluster \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION" \
+            --query 'cluster.{Name:name,Status:status,Version:version,Authentication:accessConfig.authenticationMode}' \
+            --output table
+
+          echo "=========================================="
+          echo "Current AWS Identity"
+          echo "=========================================="
+
+          aws sts get-caller-identity
+
+          echo "=========================================="
+          echo "Kubernetes Cluster Info"
+          echo "=========================================="
+
           kubectl cluster-info
+
+          echo "=========================================="
+          echo "Kubernetes Authorization Check"
+          echo "=========================================="
+
+          echo "Can list nodes:"
+          kubectl auth can-i list nodes
+
+          echo "Can get namespaces:"
+          kubectl auth can-i get namespaces
+
+          echo "Can get deployments:"
+          kubectl auth can-i get deployments \
+            -n "$KUBE_NAMESPACE"
 
           echo "=========================================="
           echo "Kubernetes Nodes"
@@ -329,5 +362,5 @@ jobs:
           echo "ECR Image   : $IMAGE_URI:$GITHUB_SHA"
           echo "EKS Cluster : $EKS_CLUSTER_NAME"
           echo "Namespace   : $KUBE_NAMESPACE"
-          echo "Deployment   : payo-backend"
+          echo "Deployment  : payo-backend"
           echo "=========================================="
