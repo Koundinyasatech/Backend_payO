@@ -30,15 +30,17 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # 2. Node
+      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: src/package-lock.json
 
       # 3. Install dependencies
       - name: Install dependencies
+        working-directory: src
         run: npm ci
 
       # 4. Configure AWS
@@ -55,43 +57,47 @@ jobs:
 
       # 6. Login to ECR
       - name: Login to Amazon ECR
-        id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       # 7. Create image tag
       - name: Set image tag
-        id: image
         run: |
           IMAGE_TAG=${GITHUB_SHA}
+
           echo "IMAGE_TAG=$IMAGE_TAG" >> "$GITHUB_ENV"
+
           echo "IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}" >> "$GITHUB_ENV"
 
       # 8. Build Docker image
       - name: Build Docker image
+        working-directory: src
         run: |
           docker build \
             -t "$IMAGE_URI" \
             .
 
-      # 9. Push image
+      # 9. Push image to ECR
       - name: Push image to ECR
         run: |
           docker push "$IMAGE_URI"
 
-      # 10. Update kubeconfig
+      # 10. Configure EKS kubeconfig
       - name: Configure kubectl
         run: |
           aws eks update-kubeconfig \
             --region "$AWS_REGION" \
             --name "$EKS_CLUSTER_NAME"
 
-      # 11. Verify EKS
-      - name: Verify EKS
+      # 11. Verify Kubernetes connection
+      - name: Verify EKS access
         run: |
-          kubectl get nodes
-          kubectl get namespace "$KUBE_NAMESPACE"
+          echo "Current Kubernetes context:"
+          kubectl config current-context
 
-      # 12. Create namespace if required
+          echo "Kubernetes nodes:"
+          kubectl get nodes
+
+      # 12. Create namespace
       - name: Ensure namespace exists
         run: |
           kubectl create namespace "$KUBE_NAMESPACE" \
@@ -101,10 +107,13 @@ jobs:
       # 13. Apply backend deployment
       - name: Deploy backend
         run: |
-          kubectl apply -f src/payo-backend/k8s/deployment.yaml
-          kubectl apply -f src/payo-backend/k8s/service.yaml
+          kubectl apply \
+            -f src/payo-backend/k8s/deployment.yaml
 
-      # 14. Update image
+          kubectl apply \
+            -f src/payo-backend/k8s/service.yaml
+
+      # 14. Update backend image
       - name: Update backend image
         run: |
           kubectl set image deployment/payo-backend \
@@ -112,9 +121,10 @@ jobs:
             -n "$KUBE_NAMESPACE"
 
       # 15. Check rollout
-      - name: Check deployment
+      - name: Check rollout
         run: |
-          kubectl rollout status deployment/payo-backend \
+          kubectl rollout status \
+            deployment/payo-backend \
             -n "$KUBE_NAMESPACE" \
             --timeout=180s
 
@@ -122,6 +132,15 @@ jobs:
       - name: Show backend resources
         if: always()
         run: |
-          kubectl get deployment -n "$KUBE_NAMESPACE"
-          kubectl get pods -n "$KUBE_NAMESPACE" -o wide
-          kubectl get svc -n "$KUBE_NAMESPACE"
+          echo "=== Deployment ==="
+          kubectl get deployment \
+            -n "$KUBE_NAMESPACE"
+
+          echo "=== Pods ==="
+          kubectl get pods \
+            -n "$KUBE_NAMESPACE" \
+            -o wide
+
+          echo "=== Services ==="
+          kubectl get svc \
+            -n "$KUBE_NAMESPACE"
