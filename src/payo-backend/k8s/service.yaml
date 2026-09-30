@@ -4,15 +4,16 @@ kind: Service
 metadata:
   name: payo-backend-service
   namespace: payo-prod
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
 
 spec:
+  type: LoadBalancer
 
   selector:
     app: payo-backend
 
   ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 3001
-
-  type: LoadBalancer
+    - protocol: TCP
+      port: 80
+      targetPort: 3001

@@ -63,12 +63,6 @@ spec:
                   name: payo-backend-secret
                   key: DB_PORT
 
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: payo-backend-secret
-                  key: JWT_SECRET
-
           resources:
             requests:
               cpu: "250m"
